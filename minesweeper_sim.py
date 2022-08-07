@@ -12,19 +12,23 @@ import numpy as np
 @dataclass
 class GameSettings:
     ''' Class to hold game settings:
-    widyjs and height of teh board, number of mines
+    dimensions of the board, number of mines
     '''
-    size: tuple = (8, 8)
+    shape: tuple = (8, 8)
     mines: int = 10
 
 
 # Presets for main game sizes
+# Classical minesweeper difficulties
 GAME_BEGINNER = GameSettings((8, 8), 10)
 GAME_INTERMEDIATE = GameSettings((16, 16), 40)
 GAME_EXPERT = GameSettings((30, 16), 99)
-GAME_TEST = GameSettings((5, 4), 4)
+# 3D example
 GAME_3D = GameSettings((3, 5, 4), 7)
+# 4D example
 GAME_4D = GameSettings((4, 3, 6, 5), 10)
+# Small board for testing
+GAME_TEST = GameSettings((5, 4), 4)
 
 # Cell types
 CELL_MINE = -1
@@ -39,47 +43,20 @@ STATUS_DEAD = 1
 STATUS_WON = 2
 
 
-class MinesweeperGame:
-    ''' Class for a minesweeper game: game board, revealed game board,
-    making a move etc
+class MinesweeperHelper:
+    ''' Class wth a few helper method to handle n-dimensional
+    minesweeper boards: list of neighbours for each cell,
+    iteration over all cells etc
     '''
 
-    def __init__(self, settings=GAME_BEGINNER, seed=None):
-        ''' Initiate a new game: generate mines, calculate numbers
+    def __init__(self, shape):
+        ''' Only need one parameter: the shape of the field
         '''
-
-        # Unpack game parameters
-        self.shape = settings.size
-        self.dimensions = len(self.shape)
-
-        # Make sure there no more mines than cells minus one
-        self.mines = min(settings.mines, np.prod(self.shape) - 1)
-
-        # Counter of remaining mines (according to what plays
-        # marked as mines, can be inaccurate).
-        self.remaining_mines = self.mines
+        self.shape = shape
 
         # This is just a dict to store all the neighbouring coordinates
         # for all cells, so we won't have to recalculate them every move
         self.neighbour_buffer = {}
-
-        # Use random seed, if seed passed
-        if seed is not None:
-            random.seed(seed)
-
-        # Generate field: array of mines and numbers that player
-        # cannot see yet
-        self.field = self.generate_mines()
-
-        # Populate it with numbers
-        self.generate_numbers()
-
-        # Initiate "uncovered": the part of the field
-        # that player sees
-        self.uncovered = np.full(self.shape, CELL_COVERED)
-
-        # Default status
-        self.status = STATUS_ALIVE
 
     def iterate_over_all_cells(self):
         ''' Returns a list
@@ -174,6 +151,46 @@ class MinesweeperGame:
             coordinates.append(random.randint(0, dimension_size - 1))
         return tuple(coordinates)
 
+
+class MinesweeperGame:
+    ''' Class for a minesweeper game: generate game board,
+    accept a move, revealed the result, etc
+    '''
+
+    def __init__(self, settings=GAME_BEGINNER, seed=None):
+        ''' Initiate a new game: generate mines, calculate numbers
+        '''
+
+        # Shape, a tuple of dimension sizes
+        self.shape = settings.shape
+
+        # Make sure there no more mines than cells minus one
+        self.mines = min(settings.mines, np.prod(self.shape) - 1)
+
+        # Counter of remaining mines (according to what plays
+        # marked as mines, can be inaccurate).
+        self.remaining_mines = self.mines
+
+        # Use random seed, if seed passed
+        if seed is not None:
+            random.seed(seed)
+
+        self.helper = MinesweeperHelper(self.shape)
+
+        # Generate field: array of mines and numbers that player
+        # cannot see yet
+        self.field = self.generate_mines()
+
+        # Populate it with numbers
+        self.generate_numbers()
+
+        # Initiate "uncovered": the part of the field
+        # that player sees
+        self.uncovered = np.full(self.shape, CELL_COVERED)
+
+        # Default status
+        self.status = STATUS_ALIVE
+
     def generate_mines(self):
         '''Generate a game field (np array) with this size and mines
         according to the setting. Mines are marked as -1
@@ -187,7 +204,7 @@ class MinesweeperGame:
             # Keep trying until a free cell is found
             while True:
 
-                cell = self.random_coords()
+                cell = self.helper.random_coords()
 
                 # If the spot is empty: set the mine there
                 if field[cell] == 0:
@@ -203,7 +220,7 @@ class MinesweeperGame:
         (because of a non-mine first move)
         '''
         # Itrate over all cells
-        for cell in self.iterate_over_all_cells():
+        for cell in self.helper.iterate_over_all_cells():
 
             # We only need non-mines cells
             if self.field[cell] == CELL_MINE:
@@ -211,7 +228,7 @@ class MinesweeperGame:
 
             # Iteration over neighbours of a mine
             # Add 1 for any mine neighbour
-            for neighbour in self.cell_surroundings(cell):
+            for neighbour in self.helper.cell_surroundings(cell):
                 if self.field[neighbour] == CELL_MINE:
                     self.field[cell] += 1
 
@@ -219,7 +236,7 @@ class MinesweeperGame:
         ''' The game still has covered cells.
         Used to detect stuck games
         '''
-        for cell in self.iterate_over_all_cells():
+        for cell in self.helper.iterate_over_all_cells():
             if self.uncovered[cell] == CELL_COVERED:
                 return True
         return False
@@ -228,7 +245,7 @@ class MinesweeperGame:
         ''' Are all cells covered?
         (to indicate the this is the very first move)
         '''
-        for cell in self.iterate_over_all_cells():
+        for cell in self.helper.iterate_over_all_cells():
             if self.uncovered[cell] != CELL_COVERED:
                 return False
         return True
@@ -239,7 +256,7 @@ class MinesweeperGame:
         And whatever mines are marked are actually mines
         (this should work for both normal and non-flag play styles)
         '''
-        for cell in self.iterate_over_all_cells():
+        for cell in self.helper.iterate_over_all_cells():
             if (self.uncovered[cell] == CELL_COVERED or
                     self.uncovered[cell] == CELL_MINE) and \
                     self.field[cell] != CELL_MINE:
@@ -251,7 +268,7 @@ class MinesweeperGame:
         ''' When the game is lost, we show all mines
         and wrongly marked mines on self.uncovered
         '''
-        for cell in self.iterate_over_all_cells():
+        for cell in self.helper.iterate_over_all_cells():
             # There is a mine that hasn't been revealed yet
             if self.field[cell] == CELL_MINE and \
                self.uncovered[cell] == CELL_COVERED:
@@ -270,7 +287,7 @@ class MinesweeperGame:
         while zeros:
 
             current_zero = zeros.pop()
-            for neighbour in self.cell_surroundings(current_zero):
+            for neighbour in self.helper.cell_surroundings(current_zero):
 
                 # Uncover any covered cells
                 if self.uncovered[neighbour] == CELL_COVERED:
@@ -284,12 +301,12 @@ class MinesweeperGame:
         ''' Check conditions for teh first click.
         If it is a mine, move it. Recalculate field.
         '''
-        if self.valid_coords(cell) and self.all_are_uncovered() and \
+        if self.helper.valid_coords(cell) and self.all_are_uncovered() and \
            self.field[cell] == CELL_MINE:
 
             while True:
 
-                move_to_cell = self.random_coords()
+                move_to_cell = self.helper.random_coords()
 
                 # If the spot is empty
                 if self.field[move_to_cell] != CELL_MINE:
@@ -306,7 +323,7 @@ class MinesweeperGame:
         ''' Mine (right) click. Simply mark cell a mine
         '''
         # Ignore invalid coordinates
-        if not self.valid_coords(cell):
+        if not self.helper.valid_coords(cell):
             return
 
         if self.uncovered[cell] == CELL_COVERED:
@@ -318,7 +335,7 @@ class MinesweeperGame:
         uncover if not. (includes flood fill for 0)
         '''
         # Ignore invalid coordinates
-        if not self.valid_coords(cell):
+        if not self.helper.valid_coords(cell):
             return
 
         # This cell has been clicked on before: ignore it
@@ -532,7 +549,7 @@ class MinesweeperGame:
                         mines.append(tuple(cell))
                     # Open around, add all surroudings
                     elif mode == "A":
-                        safe.extend(self.cell_surroundings(cell))
+                        safe.extend(self.helper.cell_surroundings(cell))
                     # Single safe
                     else:
                         safe.append(tuple(cell))
