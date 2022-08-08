@@ -151,6 +151,15 @@ class MinesweeperHelper:
             coordinates.append(random.randint(0, dimension_size - 1))
         return tuple(coordinates)
 
+    def are_all_covered(self, field):
+        ''' Are all cells covered?
+        (to indicate the this is the very first move)
+        '''
+        for cell in self.iterate_over_all_cells():
+            if field[cell] != CELL_COVERED:
+                return False
+        return True
+
 
 class MinesweeperGame:
     ''' Class for a minesweeper game: generate game board,
@@ -226,6 +235,9 @@ class MinesweeperGame:
             if self.field[cell] == CELL_MINE:
                 continue
 
+            # Resent the number (in case it is a recount)
+            self.field[cell] = 0
+
             # Iteration over neighbours of a mine
             # Add 1 for any mine neighbour
             for neighbour in self.helper.cell_surroundings(cell):
@@ -240,15 +252,6 @@ class MinesweeperGame:
             if self.uncovered[cell] == CELL_COVERED:
                 return True
         return False
-
-    def all_are_uncovered(self):
-        ''' Are all cells covered?
-        (to indicate the this is the very first move)
-        '''
-        for cell in self.helper.iterate_over_all_cells():
-            if self.uncovered[cell] != CELL_COVERED:
-                return False
-        return True
 
     def is_solved(self):
         ''' Check if the game is won.
@@ -301,7 +304,8 @@ class MinesweeperGame:
         ''' Check conditions for teh first click.
         If it is a mine, move it. Recalculate field.
         '''
-        if self.helper.valid_coords(cell) and self.all_are_uncovered() and \
+        if self.helper.valid_coords(cell) and \
+           self.helper.are_all_covered(self.uncovered) and \
            self.field[cell] == CELL_MINE:
 
             while True:
@@ -543,16 +547,19 @@ class MinesweeperGame:
                 # if coords is long enough
                 if len(cell) == len(self.shape):
 
+                    # It supposed to be a tuple
+                    cell = tuple(cell)
+
                     # Append the lists accordingly
                     # Single mine
                     if mode == "M":
-                        mines.append(tuple(cell))
+                        mines.append(cell)
                     # Open around, add all surroudings
                     elif mode == "A":
                         safe.extend(self.helper.cell_surroundings(cell))
                     # Single safe
                     else:
-                        safe.append(tuple(cell))
+                        safe.append(cell)
                     mode, cell = False, []
 
             # M and A modify the behaviour
@@ -576,7 +583,7 @@ def main():
     game = MinesweeperGame(settings=GAME_TEST, seed=seed)
 
     # For debugging: check out the field
-    # print(game.field2str(game.field))
+    print(game.field2str(game.field))
 
     # Keep making moves, while alive
     while game.status == STATUS_ALIVE:
