@@ -16,6 +16,19 @@ class GameSettings:
     '''
     shape: tuple = (8, 8)
     mines: int = 10
+    density: float = 0
+
+    def __post_init__(self):
+        self.density = self.mines / np.prod(self.shape)
+
+    def __str__(self):
+        output = ""
+        output += f"Dims:{len(self.shape)}, "
+        output += f"Shape:{self.shape}, "
+        output += f"Volume:{np.prod(self.shape)}, "
+        output += f"Mines:{self.mines}, "
+        output += f"Density:{self.density:.1%}, "
+        return output
 
 
 # Presets for main game sizes
@@ -24,7 +37,9 @@ GAME_BEGINNER = GameSettings((8, 8), 10)
 GAME_INTERMEDIATE = GameSettings((16, 16), 40)
 GAME_EXPERT = GameSettings((30, 16), 99)
 # 3D example
-GAME_3D = GameSettings((3, 5, 4), 7)
+GAME_3D_EASY = GameSettings((5, 5, 5), 10)
+GAME_3D_MEDUIM = GameSettings((7, 7, 7), 33)
+GAME_3D_HARD = GameSettings((10, 10, 10), 99)
 # 4D example
 GAME_4D = GameSettings((4, 3, 6, 5), 10)
 # Small board for testing
@@ -41,6 +56,9 @@ CELL_EXPLODED_MINE = -4  # Explosion (clicked safe, but it was a mine)
 STATUS_ALIVE = 0
 STATUS_DEAD = 1
 STATUS_WON = 2
+STATUS_MESSAGES = {STATUS_ALIVE: "Still alive",
+                   STATUS_DEAD: "You died",
+                   STATUS_WON: "You won"}
 
 
 class MinesweeperHelper:
@@ -576,10 +594,6 @@ def main():
     # Seed to generatethe game (None for random)
     seed = None
 
-    status_message = {STATUS_ALIVE: "Still alive",
-                      STATUS_DEAD: "You died",
-                      STATUS_WON: "You won"}
-
     game = MinesweeperGame(settings=GAME_TEST, seed=seed)
 
     # For debugging: check out the field
@@ -595,7 +609,7 @@ def main():
 
         # Display the results
         print(game)
-        print(f"Status: {status_message[game.status]}")
+        print(f"Status: {STATUS_MESSAGES[game.status]}")
         print(f"Remaining mines: {game.remaining_mines}")
 
     print("Thanks you for playing!")
