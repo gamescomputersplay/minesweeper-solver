@@ -200,9 +200,9 @@ class MinesweeperSolver:
 
         covered_cells = self.get_all_covered()
 
-        # 0. Random first click
+        # 0. First click on the "all 0" corner
         if self.helper.are_all_covered(self.field):
-            return [self.pick_a_random_cell(covered_cells), ], None
+            return [tuple(0 for _ in range(len(self.shape))),], None
 
         # Generate groups (main data for basic solving methods)
         self.generate_groups()
