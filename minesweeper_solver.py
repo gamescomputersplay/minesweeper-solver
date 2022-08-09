@@ -59,7 +59,7 @@ class MineGroup:
 
 class AllMineGroups:
     ''' Functions to handle a group of MineGroup object:
-    deduplicate them, generate subgroups ("at least" and "no fewer than")
+    deduplicate them, generate subgroups ("at least" and "no more than")
     '''
 
     def __init__(self):
@@ -87,23 +87,53 @@ class AllMineGroups:
         '''
         return iter(self.mine_groups)
 
-    def generate_subgroups(self):
-        ''' Populate self.subgroups ("no more than", "no fewer than"
-        groups, derived from groups).
+    def generate_subgroup_at_least(self):
+        ''' Generate "group has at least X mines" subgroup. Add them to groups.
+        Done by removing a cell and a mine, in whichever groups it is possible.
+        For example, if cell1, cell2, cell3 have 2 mines, than  cell1 and cell2
+        have at least 1 mine, so are cell2 and cell3, cell3 and cell1.
         '''
-
-        # Generate "at least" subgroup
         for group in self:
-            if len(group.cells) > group.mines and len(group.cells) > 2 and \
-               group.mines > 1 and group.group_type in ("exactly", "at least"):
-                print("G", group)
-                for cell in group.cells:
 
+            # Doing it for cells in the middle of nowhere would take a lot of
+            # resources but virtually never useful.
+            if len(group.cells) == 8:
+                continue
+
+            # Group should have 3>2 cells and > 1 mines
+            # And  be either "exactly" or "at least" group
+            if len(group.cells) > 2 and group.mines > 1 and \
+                group.group_type in ("exactly", "at least"):
+
+                # Remove each cell and one mine - those  are your new subgroups
+                for cell in group.cells:
                     new_subgroup = MineGroup(group.cells.difference({cell}),
                                              group.mines - 1, "at least")
+                    # They will be added to the end of the list, so they
+                    # in turn will be broken down, if needed
                     self.add(new_subgroup)
-                    print("SG", new_subgroup)
 
+
+    def generate_subgroup_no_more_than(self):
+        ''' Generate a second type of subgroups: "no more than", also add
+        to the group. This one done by removing cells until there are mines+1
+        left. For example, cell1 cell2, cell3 have 1 mine, which means that
+        cell1 and cell2 have no more than 1 mine.
+        '''
+        for group in self:
+
+            # Same here, no use  doing it to lonely cells out there
+            if len(group.cells) == 8:
+                continue
+
+            # Here we need >2 cells and >0 mines to create  subgroups
+            if len(group.cells) > 2 and group.mines > 0 and \
+                group.group_type in ("exactly", "no more than"):
+
+                for cell in group.cells:
+                    new_subgroup = MineGroup(group.cells.difference({cell}),
+                                             group.mines, "no more than")
+                    self.add(new_subgroup)
 
 class MinesweeperSolver:
     ''' Methods related to solving minesweeper game. '''
@@ -114,7 +144,7 @@ class MinesweeperSolver:
 
         # Shape, a tuple of dimension sizes
         self.shape = settings.shape
-        # Number of total mines in the game
+        # N umber of total mines in the game
         self.total_mines = settings.mines
 
         # Initiate helper (itiration through all cells, neighbours etc)
@@ -272,7 +302,9 @@ class MinesweeperSolver:
 
         # 3. Sub groups Method
         ######################
-        # self.groups.generate_subgroups()
+        # generate subgroups
+        self.groups.generate_subgroup_at_least()
+        self.groups.generate_subgroup_no_more_than()
         safe, mines = self.method_subgroups()
         if safe or mines:
             return safe, mines
