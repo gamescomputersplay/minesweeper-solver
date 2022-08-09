@@ -198,7 +198,7 @@ class MinesweeperGame:
         # marked as mines, can be inaccurate).
         self.remaining_mines = self.mines
 
-        # Use random seed, if seed passed
+        # Use seed, if seed passed
         if seed is not None:
             random.seed(seed)
 

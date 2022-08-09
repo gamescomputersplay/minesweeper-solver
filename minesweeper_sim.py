@@ -3,6 +3,7 @@
 
 import time
 import math
+import random
 
 import minesweeper_game as ms
 import minesweeper_solver as msolve
@@ -12,12 +13,20 @@ class MinesweeperSim:
     ''' Methods to handle minesweeper game simulation
     '''
 
-    def __init__(self, runs, settings):
+    def __init__(self, runs, settings, seed=None):
         self.runs = runs
         self.settings = settings
 
         # List to store the results
         self.results = []
+
+        # Use seed, if seed passed
+        if seed is not None:
+            random.seed(seed)
+
+        # Generate starting seeds for all games (do it now, so random
+        # calls in the solver would not affect it).
+        self.game_seeds = [random.random() for _ in range(self.runs)]
 
         # Run the simulation (with timing)
         start_time = time.time()
@@ -29,7 +38,8 @@ class MinesweeperSim:
         Verbose would show board for every move
         '''
 
-        game = ms.MinesweeperGame(self.settings)
+        # Start the game, using one of the seeds
+        game = ms.MinesweeperGame(self.settings, self.game_seeds.pop())
         solver = msolve.MinesweeperSolver(self.settings)
 
         while game.status == ms.STATUS_ALIVE:
@@ -95,10 +105,18 @@ class MinesweeperSim:
 def main():
     ''' Run a sample simulation
     '''
+
+    # use seed for replicable simulations
+    seed = 0
+
+    # games to simulate
+    runs = 10000
+
     for settings in (ms.GAME_BEGINNER, ms.GAME_INTERMEDIATE, ms.GAME_EXPERT,
                      ms.GAME_3D_EASY, ms.GAME_3D_MEDUIM, ms.GAME_3D_HARD,
                      ms.GAME_4D_EASY):
-        simulation = MinesweeperSim(100, settings)
+
+        simulation = MinesweeperSim(runs, settings, seed)
         print(simulation)
         print(simulation.display_stats())
 

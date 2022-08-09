@@ -174,7 +174,7 @@ class MinesweeperSolver:
                     # If difference in number of cells is the same as
                     # difference in number of mines: difference is mines
                     elif len(group_b.cells - group_a.cells) == \
-                         group_b.mines - group_a.mines:
+                            group_b.mines - group_a.mines:
                         mines.extend(list(group_b.cells - group_a.cells))
 
                     # Difference in cells and mines can also become a new group
