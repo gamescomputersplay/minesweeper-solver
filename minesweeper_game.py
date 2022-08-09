@@ -41,7 +41,7 @@ GAME_3D_EASY = GameSettings((5, 5, 5), 10)
 GAME_3D_MEDUIM = GameSettings((7, 7, 7), 33)
 GAME_3D_HARD = GameSettings((10, 10, 10), 99)
 # 4D example
-GAME_4D = GameSettings((4, 3, 6, 5), 10)
+GAME_4D_EASY = GameSettings((4, 4, 4, 4), 10)
 # Small board for testing
 GAME_TEST = GameSettings((5, 4), 4)
 
