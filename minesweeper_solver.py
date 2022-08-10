@@ -468,6 +468,7 @@ class MinesweeperSolver:
 
         # 3. Sub groups Method
         ######################
+        # TODO: doesn't seem to work for 3d
         safe, mines = self.method_subgroups()
         if safe or mines:
             return safe, mines

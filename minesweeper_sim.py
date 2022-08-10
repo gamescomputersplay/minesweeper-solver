@@ -112,12 +112,13 @@ def main():
     # games to simulate
     runs = 100
 
-    # all_presets = (ms.GAME_BEGINNER, ms.GAME_INTERMEDIATE, ms.GAME_EXPERT,
-    #               ms.GAME_3D_EASY, ms.GAME_3D_MEDUIM, ms.GAME_3D_HARD,
-    #               ms.GAME_4D_EASY)
-    only_2d = (ms.GAME_BEGINNER, ms.GAME_INTERMEDIATE, ms.GAME_EXPERT)
+    presets = (ms.GAME_BEGINNER, ms.GAME_INTERMEDIATE, ms.GAME_EXPERT,
+               ms.GAME_3D_EASY, ms.GAME_3D_MEDUIM, ms.GAME_3D_HARD,
+               ms.GAME_4D_EASY, ms.GAME_4D_MEDIUM, ms.GAME_4D_HARD,
+               ms.GAME_4D_HARDER)
+    # only_2d = (ms.GAME_BEGINNER, ms.GAME_INTERMEDIATE, ms.GAME_EXPERT)
 
-    for settings in only_2d:
+    for settings in presets:
 
         simulation = MinesweeperSim(runs, settings, seed)
         print(simulation)
