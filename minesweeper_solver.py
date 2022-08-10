@@ -22,11 +22,15 @@ class MineGroup:
         self.cells = set(cells)
         self.mines = mines
 
-        # Group type (exctly, no more than, no fewer than)
+        # Group type ("exactly", "no more than", "at least")
         self.group_type = group_type
 
         # Calculate hash (for dedupliaction)
         self.hash = self.calculate_hash()
+
+        # Placeholder for cluster information
+        # (each group can belong to only one cluster)
+        self.belongs_to_cluster = None
 
     def is_all_safe(self):
         ''' If group has 0 mines, it is safe
@@ -73,6 +77,21 @@ class AllMineGroups:
         '''
         self.hashes = set()
         self.mine_groups = []
+
+    def reset_clusters(self):
+        ''' Clear "belong to cluster" for each group.
+        '''
+        for group in self.mine_groups:
+            group.belong_to_cluster = None
+
+    def next_non_clustered_groups(self):
+        ''' Return first found group, that is not a part of a cluster
+        '''
+        for group in self.mine_groups:
+            if group.belong_to_cluster is None and \
+               group.group_type == "exactly":
+                return group
+        return None
 
     def add(self, new_group):
         ''' Check if if have this group already.
@@ -135,6 +154,46 @@ class AllMineGroups:
                     self.add(new_subgroup)
 
 
+class CellCluster:
+    ''' CellCluster is a group of cells connected together by an overlaping
+    list of groups. In other words mine/safe in any of the cell, can
+    potentially trigger safe/mine in any other cell of the cluster.
+    Is a basic class for CSP (constrait satisfaction problem) method
+    '''
+
+    def __init__(self, group=None):
+        # List of cells in the cluster
+        self.cells = set()
+        # List if groups in the cluster
+        self.groups = []
+
+        # Initiate by adding the first group
+        if group is not None:
+            self.add(group)
+
+    def add(self, group):
+        ''' Adding group to a cluster (assume they overlap).
+        Add group's cells to the set of cells
+        Also, mark the group as belonging to this cluster
+        '''
+        # Total list of cells in the cluster (union of all groups)
+        self.cells = self.cells.union(group.cells)
+        # List of groups belonging to the cluster
+        self.groups.append(group)
+        # Mark the group that it has been used
+        group.belong_to_cluster = self
+
+    def overlap(self, group):
+        ''' Check if cells in group overlap with cells in the cluster.
+        '''
+        return len(self.cells & group.cells) > 0
+
+    def __str__(self):
+        output = f"Cluster with {len(self.groups)} group(s) "
+        output += f"and {len(self.cells)} cell(s): {self.cells}"
+        return output
+
+
 class MinesweeperSolver:
     ''' Methods related to solving minesweeper game. '''
 
@@ -155,6 +214,9 @@ class MinesweeperSolver:
 
         # Placeholder for all groups. Recalculated for each solver run
         self.groups = AllMineGroups()
+
+        # Placeholder for clusters (main element of CSP method)
+        self.clusters = []
 
     def get_all_covered(self):
         ''' Return the list of all covered cells
@@ -203,6 +265,37 @@ class MinesweeperSolver:
                 if covered_neighbours:
                     new_group = MineGroup(covered_neighbours, active_mines)
                     self.groups.add(new_group)
+
+    def generate_clusters(self):
+        '''Populate self.clsters with cell clusters
+        '''
+        # Reset clusters
+        self.clusters = []
+        self.groups.reset_clusters()
+
+        # Keep going as long as there are groups not belonging to clusters
+        while self.groups.next_non_clustered_groups() is not None:
+
+            # Initiate a new cluster with such a group
+            new_cluster = CellCluster(self.groups.next_non_clustered_groups())
+
+            while True:
+
+                # Look through all groups
+                for group in self.groups:
+                    # If it overlanps with this group and not part of any
+                    # other cluster - add this group
+                    if group.group_type == "exactly" and \
+                       group.belong_to_cluster is None and \
+                       new_cluster.overlap(group):
+                        new_cluster.add(group)
+                        break
+
+                # We went through the groups without adding any:
+                # new_cluster is done
+                else:
+                    self.clusters.append(new_cluster)
+                    break
 
     def method_naive(self):
         ''' Method #1. Naive
@@ -294,6 +387,12 @@ class MinesweeperSolver:
         ''' Subgroups method. Based on breaking groups down "at least" and
         "no more than" subgroups and cross checking them with groups.
         '''
+        # Generate subgroups
+        # Funny thing, it actually works just as well with only one
+        # (either) of these two generated
+        self.groups.generate_subgroup_at_least()
+        self.groups.generate_subgroup_no_more_than()
+
         safe, mines = [], []
 
         # The idea is similar to the "groups" method:
@@ -323,6 +422,17 @@ class MinesweeperSolver:
                     # Group B (1, 2, 3) has X mines: then cell3 is safe
                     mines.extend(self.deduce_mines(group_a, group_b))
 
+        return list(set(safe)), list(set(mines))
+
+    def method_csp(self):
+        ''' CSP method. We look at the overlapping groups to check if some
+        cells are always safe or mines in all valid solutions.
+        '''
+
+        # Generate clusters
+        self.generate_clusters()
+
+        safe, mines = [], []
         return list(set(safe)), list(set(mines))
 
     def solve(self, field):
@@ -358,13 +468,14 @@ class MinesweeperSolver:
 
         # 3. Sub groups Method
         ######################
-        # generate subgroups
-        # Funny thing, it actually works just as well with only one
-        # (either) of these two generated
-        self.groups.generate_subgroup_at_least()
-        self.groups.generate_subgroup_no_more_than()
-        # Actually subgroup method
         safe, mines = self.method_subgroups()
+        if safe or mines:
+            return safe, mines
+
+        # 4. CSP method
+        # (stands for Constraint Satisfaction Problem)
+        ######################
+        safe, mines = self.method_csp()
         if safe or mines:
             return safe, mines
 
@@ -379,7 +490,7 @@ def main():
     settings = ms.GAME_TEST
     settings = ms.GAME_BEGINNER
 
-    game = ms.MinesweeperGame(settings, seed=1)
+    game = ms.MinesweeperGame(settings, seed=0)
     solver = MinesweeperSolver(settings)
 
     while game.status == ms.STATUS_ALIVE:
