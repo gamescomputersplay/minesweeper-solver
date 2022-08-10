@@ -74,7 +74,10 @@ class MinesweeperHelper:
 
         # This is just a dict to store all the neighbouring coordinates
         # for all cells, so we won't have to recalculate them every move
-        self.neighbour_buffer = {}
+        self.neighbours_cache = {}
+
+        # Cache for the list of all iterations
+        self.all_iteartions_cache = None
 
     def iterate_over_all_cells(self):
         ''' Returns a list
@@ -82,6 +85,10 @@ class MinesweeperHelper:
         of all possible coordinates.
         Kind of like "range" but for D-dimensional array of cells.
         '''
+        # Serve from cache, if available
+        if self.all_iteartions_cache is not None:
+            return self.all_iteartions_cache
+
         permutations = []
 
         # We'll have as many permutations as product of all dimensions
@@ -112,6 +119,7 @@ class MinesweeperHelper:
             this_permutation.reverse()
             permutations.append(tuple(this_permutation))
 
+        self.all_iteartions_cache = permutations
         return permutations
 
     def valid_coords(self, cell):
@@ -129,8 +137,8 @@ class MinesweeperHelper:
         taking borders into account
         '''
         # Dinamic programming: use buffer if the result is there
-        if cell in self.neighbour_buffer:
-            return self.neighbour_buffer[cell]
+        if cell in self.neighbours_cache:
+            return self.neighbours_cache[cell]
 
         surroundings = []
 
@@ -156,7 +164,7 @@ class MinesweeperHelper:
                 surroundings.append(cell_with_offest)
 
         # Store in buffer, for future reuse
-        self.neighbour_buffer[cell] = surroundings
+        self.neighbours_cache[cell] = surroundings
 
         return surroundings
 
