@@ -103,7 +103,7 @@ class AllMineGroups:
             # Group should have 3>2 cells and > 1 mines
             # And  be either "exactly" or "at least" group
             if len(group.cells) > 2 and group.mines > 1 and \
-                group.group_type in ("exactly", "at least"):
+               group.group_type in ("exactly", "at least"):
 
                 # Remove each cell and one mine - those  are your new subgroups
                 for cell in group.cells:
@@ -112,7 +112,6 @@ class AllMineGroups:
                     # They will be added to the end of the list, so they
                     # in turn will be broken down, if needed
                     self.add(new_subgroup)
-
 
     def generate_subgroup_no_more_than(self):
         ''' Generate a second type of subgroups: "no more than", also add
@@ -128,12 +127,13 @@ class AllMineGroups:
 
             # Here we need >2 cells and >0 mines to create  subgroups
             if len(group.cells) > 2 and group.mines > 0 and \
-                group.group_type in ("exactly", "no more than"):
+               group.group_type in ("exactly", "no more than"):
 
                 for cell in group.cells:
                     new_subgroup = MineGroup(group.cells.difference({cell}),
                                              group.mines, "no more than")
                     self.add(new_subgroup)
+
 
 class MinesweeperSolver:
     ''' Methods related to solving minesweeper game. '''
@@ -222,6 +222,45 @@ class MinesweeperSolver:
 
         return list(set(safe)), list(set(mines))
 
+    @staticmethod
+    def deduce_safe(group_a, group_b):
+        ''' Given two mine groups, deduce if there are any safe cells.
+        '''
+
+        # For that, we need two conditions:
+        # 1. A is a subset of B (only checks this way, so extarnal function
+        # need to make sure this function called both ways).
+        if group_a.cells.issubset(group_b.cells):
+
+            # 2. They have the same number of mines.
+            # If so, difference is safe
+            # For example, if A(1,2) has one mine and B (1, 2, 3)
+            # has 1 mine, cell 3 is safe
+            if group_b.mines == group_a.mines:
+                return list(group_b.cells - group_a.cells)
+
+        return []
+
+    @staticmethod
+    def deduce_mines(group_a, group_b):
+        ''' Given two mine groups, deduce if there are any mines.
+        '''
+
+        # For that, we need two conditions:
+        # 1. A is a subset of B (only checks this way, so extarnal function
+        # need to make sure this function called both ways).
+        if group_a.cells.issubset(group_b.cells):
+
+            # 2. If difference in number of cells is the same as
+            # difference in number of mines: difference is mines
+            # For example if A (1, 2) has 1 mine and B (1, 2, 3) has 2 mines,
+            # cell 3 is a mine
+            if len(group_b.cells - group_a.cells) == \
+                    group_b.mines - group_a.mines:
+                return list(group_b.cells - group_a.cells)
+
+        return []
+
     def method_groups(self):
         ''' Method #2. Groups
         Cross check all groups. When group is a subset of
@@ -237,36 +276,53 @@ class MinesweeperSolver:
                 if group_a.hash == group_b.hash:
                     continue
 
-                # See if A is a subset of B
-                # Note: we assume that B is bigger, becase when we add extra
-                # groups (in the end of this method), they are guaranteed to
-                # be be compared as group_a to all items as group_b. As the new
-                # item will be smaller, group_b item will be a bigger one
-                if group_a.cells.issubset(group_b.cells):
+                safe.extend(self.deduce_safe(group_a, group_b))
+                mines.extend(self.deduce_mines(group_a, group_b))
 
-                    # If they have the same mines: difference is safe
-                    if group_b.mines == group_a.mines:
-                        safe.extend(list(group_b.cells - group_a.cells))
-
-                    # If difference in number of cells is the same as
-                    # difference in number of mines: difference is mines
-                    elif len(group_b.cells - group_a.cells) == \
-                            group_b.mines - group_a.mines:
-                        mines.extend(list(group_b.cells - group_a.cells))
-
-                    # Difference in cells and mines can also become a new group
-                    else:
-                        new_group = MineGroup(group_b.cells - group_a.cells,
-                                              group_b.mines - group_a.mines)
-                        self.groups.add(new_group)
+                # Difference in cells and mines can also become a new group
+                # As lost as one is subset of the other and they have different
+                # number of mines
+                if group_a.cells.issubset(group_b.cells) and \
+                   group_b.mines - group_a.mines > 0:
+                    new_group = MineGroup(group_b.cells - group_a.cells,
+                                          group_b.mines - group_a.mines)
+                    self.groups.add(new_group)
 
         return list(set(safe)), list(set(mines))
 
     def method_subgroups(self):
-        ''' Subgroups method. Based on breaking groups down "into no more
-        than", "no fewer than" subgroups and cross checking them with groups.
+        ''' Subgroups method. Based on breaking groups down "at least" and
+        "no more than" subgroups and cross checking them with groups.
         '''
         safe, mines = [], []
+
+        # The idea is similar to the "groups" method:
+        # cross-check all the groups, but this time
+        # we only will check "at least" and "no more than"
+        # subgroups
+        for group_a in self.groups:
+            for group_b in self.groups:
+
+                # Only compare subgroups "at least" to groups.
+                if group_a.group_type == "at least" and \
+                   group_b.group_type == "exactly":
+
+                    # Similar to "groups" method: if mines are the same,
+                    # the difference is safe
+                    # Subgroup A (cells 1, 2) has at least X mines,
+                    # Group B (1, 2, 3) has X mines: then cell3 is safe
+                    safe.extend(self.deduce_safe(group_a, group_b))
+
+                # Only compare subgroups "no more than" to groups.
+                if group_a.group_type == "no more than" and \
+                   group_b.group_type == "exactly":
+
+                    # Similar to "groups" method: if mines are the same,
+                    # the difference is safe
+                    # Subgroup A (cells 1, 2) has at least X mines,
+                    # Group B (1, 2, 3) has X mines: then cell3 is safe
+                    mines.extend(self.deduce_mines(group_a, group_b))
+
         return list(set(safe)), list(set(mines))
 
     def solve(self, field):
@@ -303,8 +359,11 @@ class MinesweeperSolver:
         # 3. Sub groups Method
         ######################
         # generate subgroups
+        # Funny thing, it actually works just as well with only one
+        # (either) of these two generated
         self.groups.generate_subgroup_at_least()
         self.groups.generate_subgroup_no_more_than()
+        # Actually subgroup method
         safe, mines = self.method_subgroups()
         if safe or mines:
             return safe, mines
@@ -320,7 +379,7 @@ def main():
     settings = ms.GAME_TEST
     settings = ms.GAME_BEGINNER
 
-    game = ms.MinesweeperGame(settings, seed=0)
+    game = ms.MinesweeperGame(settings, seed=1)
     solver = MinesweeperSolver(settings)
 
     while game.status == ms.STATUS_ALIVE:
