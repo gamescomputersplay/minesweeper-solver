@@ -116,7 +116,7 @@ class AllMineGroups:
 
             # Doing it for cells in the middle of nowhere would take a lot of
             # resources but virtually never useful.
-            if len(group.cells) == 8:
+            if len(group.cells) > 7:
                 continue
 
             # Group should have 3>2 cells and > 1 mines
@@ -141,7 +141,7 @@ class AllMineGroups:
         for group in self:
 
             # Same here, no use  doing it to lonely cells out there
-            if len(group.cells) == 8:
+            if len(group.cells) > 7:
                 continue
 
             # Here we need >2 cells and >0 mines to create  subgroups
@@ -152,6 +152,11 @@ class AllMineGroups:
                     new_subgroup = MineGroup(group.cells.difference({cell}),
                                              group.mines, "no more than")
                     self.add(new_subgroup)
+
+    def __str__(self):
+        ''' Some info about the groups (for debugging)
+        '''
+        return f"MineGroups contains {len(self.mine_groups)} groups"
 
 
 class CellCluster:
@@ -375,7 +380,10 @@ class MinesweeperSolver:
                 # Difference in cells and mines can also become a new group
                 # As lost as one is subset of the other and they have different
                 # number of mines
-                if group_a.cells.issubset(group_b.cells) and \
+                # len(group_b.cells) < 8 prevents computational explosion on
+                # multidimensional fields
+                if len(group_b.cells) < 8 and \
+                   group_a.cells.issubset(group_b.cells) and \
                    group_b.mines - group_a.mines > 0:
                     new_group = MineGroup(group_b.cells - group_a.cells,
                                           group_b.mines - group_a.mines)
@@ -468,7 +476,6 @@ class MinesweeperSolver:
 
         # 3. Sub groups Method
         ######################
-        # TODO: doesn't seem to work for 3d
         safe, mines = self.method_subgroups()
         if safe or mines:
             return safe, mines
