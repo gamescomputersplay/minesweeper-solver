@@ -80,7 +80,7 @@ class MinesweeperHelper:
         self.neighbours_cache = {}
 
         # Cache for the list of all iterations
-        self.all_iteartions_cache = None
+        self.all_iterations_cache = None
 
     def iterate_over_all_cells(self):
         ''' Returns a list
@@ -89,8 +89,8 @@ class MinesweeperHelper:
         Kind of like "range" but for D-dimensional array of cells.
         '''
         # Serve from cache, if available
-        if self.all_iteartions_cache is not None:
-            return self.all_iteartions_cache
+        if self.all_iterations_cache is not None:
+            return self.all_iterations_cache
 
         permutations = []
 
@@ -122,7 +122,7 @@ class MinesweeperHelper:
             this_permutation.reverse()
             permutations.append(tuple(this_permutation))
 
-        self.all_iteartions_cache = permutations
+        self.all_iterations_cache = permutations
         return permutations
 
     def valid_coords(self, cell):

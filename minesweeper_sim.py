@@ -98,7 +98,7 @@ class MinesweeperSim:
         ''' Show parameters of teh simulation
         '''
 
-        output = f"Settings: {self.settings}, " + \
+        output = f"Settings: {self.settings}" + \
                  f"Runs: {self.runs}"
         return output
 

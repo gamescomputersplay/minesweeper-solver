@@ -4,6 +4,7 @@ minesweeper-game.py
 '''
 
 import random
+import math
 import minesweeper_game as ms
 
 
@@ -168,7 +169,7 @@ class CellCluster:
 
     def __init__(self, group=None):
         # List of cells in the cluster
-        self.cells = set()
+        self.cells_set = set()
         # List if groups in the cluster
         self.groups = []
 
@@ -176,13 +177,21 @@ class CellCluster:
         if group is not None:
             self.add(group)
 
+        # Placeholder for a list of set (we need them in a fixed order)
+        self.cells = []
+
+        # Placeholder for the solutions of this CSP
+        # (all valid sets of mines and safe cells)
+        # Positions corresponds to self.cells
+        self.solutions = []
+
     def add(self, group):
         ''' Adding group to a cluster (assume they overlap).
         Add group's cells to the set of cells
         Also, mark the group as belonging to this cluster
         '''
         # Total list of cells in the cluster (union of all groups)
-        self.cells = self.cells.union(group.cells)
+        self.cells_set = self.cells_set.union(group.cells)
         # List of groups belonging to the cluster
         self.groups.append(group)
         # Mark the group that it has been used
@@ -191,11 +200,133 @@ class CellCluster:
     def overlap(self, group):
         ''' Check if cells in group overlap with cells in the cluster.
         '''
-        return len(self.cells & group.cells) > 0
+        return len(self.cells_set & group.cells) > 0
+
+    @staticmethod
+    def all_mines_positions(cells_count, mines_to_set):
+        ''' Generate all permuations for "Choose k from n",
+        which is equivalent to all possible ways mines are
+        located in the cells.
+        Result is a list of tuples like (False, False, True, False),
+        indicating if the item was chosen (if there is a mine in the cell).
+        For example, for generate_mines_permutations(2, 1) the output is:
+        [(True, False), (Fasle, True)]
+        '''
+
+        def recursive_choose_generator(current_combination, mines_to_set):
+            ''' Recursive part of "Choose without replacement" permutation
+            generator, results are put into outside "result" variable
+            '''
+            # No mines to set: save results, out of the recursion
+            if mines_to_set == 0:
+                result.add(tuple(current_combination))
+                return
+
+            for position, item in enumerate(current_combination):
+                # Find all the "False" (not a mine) cells
+                if not item:
+                    # Put a mine in it, go to the next recursion level
+                    current_copy = current_combination.copy()
+                    current_copy[position] = True
+                    recursive_choose_generator(current_copy, mines_to_set - 1)
+
+        result = set()
+        all_cells_false = [False for _ in range(cells_count)]
+        recursive_choose_generator(all_cells_false, mines_to_set)
+        return result
+
+    def solve_csp(self):
+        ''' Use CSP to find safe cells and mines in the cluster
+        '''
+        # It gets too slow and inefficient when
+        # - There are too many, but clusters but not enough groups
+        #    (cells/clusters > 12)
+        # - Long clusters (>40 cells)
+        # - Groups with too many possible mine positions (> 1001)
+        # Do not solve such clusters
+        if len(self.cells_set) / len(self.groups) > 12 or \
+           len(self.cells_set) > 40 or \
+           max([math.comb(len(group.cells), group.mines)
+                for group in self.groups]) > 1001:
+            return
+
+        # We need to fix the order of cells, for that we populate self.cells
+        self.cells = list(self.cells_set)
+
+        # We also need a way to find a position of each cell by
+        # the cell itself. So here's the addressing dict
+        cells_positions = {cell: pos for pos, cell in enumerate(self.cells)}
+
+        # The list to put all the solutions in.
+        # Each "solution" is a list of [True, False, None, ...],
+        # corresponding to cluster's ordered cells,
+        # where True is a mine, False is safe and None is unknown
+        # It starts with all None and will be updated for each group
+        solutions = [[None for _ in range(len(self.cells))], ]
+
+        for group in self.groups:
+
+            # List of all possible ways mines can be placed in
+            # group's cells: for example: [(False, True, False), ...]
+            mine_positions = self.all_mines_positions(len(group.cells),
+                                                      group.mines)
+            # Now the same, but with cells as keys
+            # For example: {cell1: False, cell2: True, cell3: False}
+            mine_positions_dict = [dict(zip(group.cells, mine_position))
+                                   for mine_position in mine_positions]
+
+            # Failsafe: if there are more than 1_000_000 combinations
+            # to go through - pull the plug
+            if len(solutions) * len(mine_positions) > 1_000_000:
+                return
+
+            # This is where will will put solutions,
+            # updated with current group's conditions
+            updated_solutions = []
+
+            # Go through each current solution and possible
+            # mine distribution in a group
+            for solution in solutions:
+                for mine_position in mine_positions_dict:
+
+                    updated_solution = solution.copy()
+
+                    # Check if this permutation fits with this solution
+                    for cell in group.cells:
+                        # This is the position of this cell in the solution
+                        position = cells_positions[cell]
+                        # If solution has nothing about this cell,
+                        # just update it with cell data
+                        if updated_solution[position] is None:
+                            updated_solution[position] = mine_position[cell]
+                        # But if there is already mine or safe in the solution:
+                        # it should be the same as in the permutation
+                        # If it isn't: break to the next permutation
+                        elif updated_solution[position] != mine_position[cell]:
+                            break
+                    # If we didn't break (solution and permutation fits),
+                    # Add it to the next round
+                    else:
+                        updated_solutions.append(updated_solution)
+
+            solutions = updated_solutions
+
+        self.solutions = solutions
+
+    def calculate_hash(self):
+        ''' Hash of a cluster. To check if we already dealt with this one
+        '''
+        # Prepare data for hashing: sort cells, add number of groups
+        # (should be enough to identify a cluster)
+        for_hash = sorted(list(self.cells_set)) + [len(self.groups)]
+        # Make immutable
+        for_hash = tuple(for_hash)
+        # Return hash
+        return hash(for_hash)
 
     def __str__(self):
         output = f"Cluster with {len(self.groups)} group(s) "
-        output += f"and {len(self.cells)} cell(s): {self.cells}"
+        output += f"and {len(self.cells_set)} cell(s): {self.cells_set}"
         return output
 
 
@@ -223,6 +354,10 @@ class MinesweeperSolver:
         # Placeholder for clusters (main element of CSP method)
         self.clusters = []
 
+        # History of clusters we already processed, so we won't have to
+        # solved them again (they can be quite time consuming)
+        self.clusters_history = set()
+
     def get_all_covered(self):
         ''' Return the list of all covered cells
         '''
@@ -247,35 +382,39 @@ class MinesweeperSolver:
 
         # Go over all cells and find all the "Numbered ones"
         for cell in self.helper.iterate_over_all_cells():
-            if self.field[cell] > 0:
 
-                # For them we'll need to know two things:
-                # What are the uncovered cells around it
-                covered_neighbours = []
-                # And how many "Acive" (that is, minus marked)
-                # mines are still there
-                active_mines = self.field[cell]
+            # Groups are only for numbered cells
+            if self.field[cell] <= 0:
+                continue
 
-                # Go through the neighbours
-                for neighbour in self.helper.cell_surroundings(cell):
-                    # Collect all covered cells
-                    if self.field[neighbour] == ms.CELL_COVERED:
-                        covered_neighbours.append(neighbour)
-                    # Substruct all marked mines
-                    if self.field[neighbour] == ms.CELL_MINE:
-                        active_mines -= 1
+            # For them we'll need to know two things:
+            # What are the uncovered cells around it
+            covered_neighbours = []
+            # And how many "Acive" (that is, minus marked)
+            # mines are still there
+            active_mines = self.field[cell]
 
-                # If the list of covered cells is not empty:
-                # store it in the self.groups
-                if covered_neighbours:
-                    new_group = MineGroup(covered_neighbours, active_mines)
-                    self.groups.add(new_group)
+            # Go through the neighbours
+            for neighbour in self.helper.cell_surroundings(cell):
+                # Collect all covered cells
+                if self.field[neighbour] == ms.CELL_COVERED:
+                    covered_neighbours.append(neighbour)
+                # Substruct all marked mines
+                if self.field[neighbour] == ms.CELL_MINE:
+                    active_mines -= 1
+
+            # If the list of covered cells is not empty:
+            # store it in the self.groups
+            if covered_neighbours:
+                new_group = MineGroup(covered_neighbours, active_mines)
+                self.groups.add(new_group)
 
     def generate_clusters(self):
         '''Populate self.clsters with cell clusters
         '''
         # Reset clusters
         self.clusters = []
+        # Reset all "belong to cluster" information from the groups
         self.groups.reset_clusters()
 
         # Keep going as long as there are groups not belonging to clusters
@@ -299,7 +438,10 @@ class MinesweeperSolver:
                 # We went through the groups without adding any:
                 # new_cluster is done
                 else:
-                    self.clusters.append(new_cluster)
+                    # We don't want clusters made of 1 group
+                    if len(new_cluster.groups) > 1:
+                        self.clusters.append(new_cluster)
+                    # But exit the while anyway
                     break
 
     def method_naive(self):
@@ -436,9 +578,20 @@ class MinesweeperSolver:
         ''' CSP method. We look at the overlapping groups to check if some
         cells are always safe or mines in all valid solutions.
         '''
-
         # Generate clusters
         self.generate_clusters()
+        for cluster in self.clusters:
+
+            # Cluster deduplication. If we solved this cluster already, ignore
+            if cluster.calculate_hash() in self.clusters_history:
+                continue
+
+            # Solve the cluster
+            # print(f"CSP! Cluster: {cluster}")
+            cluster.solve_csp()
+
+            # Save cluster's hash in history for deduplication
+            self.clusters_history.add(cluster.calculate_hash())
 
         safe, mines = [], []
         return list(set(safe)), list(set(mines))
