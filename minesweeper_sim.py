@@ -89,7 +89,8 @@ class MinesweeperSim:
         winrate = self.winrate()
         output += f"Win rate: {winrate:.1%}±{self.margin_of_error():.1%}\n"
         output += f"Total time: {self.spent_time:.0f}s, "
-        output += f"Time per game: {self.spent_time / self.runs:.2f}s\n"
+        output += f"Time per game: {self.spent_time / self.runs:.2f}s, "
+        output += f"Games per sec: {self.runs / self.spent_time:.2f}s\n"
 
         return output
 
