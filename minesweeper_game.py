@@ -1,5 +1,5 @@
 ''' Class for simulating n-dimensional minesweeper games:
-generte board, input a move, answer with resulting boards etc.
+generate board, input a move, answer with resulting boards etc.
 (Visualization only works for n in (2, 3, 4))
 '''
 
@@ -38,7 +38,7 @@ GAME_INTERMEDIATE = GameSettings((16, 16), 40)
 GAME_EXPERT = GameSettings((30, 16), 99)
 # 3D example
 GAME_3D_EASY = GameSettings((5, 5, 5), 10)
-GAME_3D_MEDUIM = GameSettings((7, 7, 7), 33)
+GAME_3D_MEDIUM = GameSettings((7, 7, 7), 33)
 GAME_3D_HARD = GameSettings((10, 10, 10), 99)
 # 4D example
 GAME_4D_EASY = GameSettings((4, 4, 4, 4), 10)
@@ -66,7 +66,7 @@ STATUS_MESSAGES = {STATUS_ALIVE: "Still alive",
 
 class MinesweeperHelper:
     ''' Class wth a few helper method to handle n-dimensional
-    minesweeper boards: list of neighbours for each cell,
+    minesweeper boards: list of neighbors for each cell,
     iteration over all cells etc
     '''
 
@@ -75,9 +75,9 @@ class MinesweeperHelper:
         '''
         self.shape = shape
 
-        # This is just a dict to store all the neighbouring coordinates
+        # This is just a dict to store all the neighboring coordinates
         # for all cells, so we won't have to recalculate them every move
-        self.neighbours_cache = {}
+        self.neighbors_cache = {}
 
         # Cache for the list of all iterations
         self.all_iterations_cache = None
@@ -101,7 +101,7 @@ class MinesweeperHelper:
             this_permutation = []
             # And a copy of permutation's cardinal number
             # (need a copy, as we will mutate  it)
-            remainding_number = permutation_number
+            remaining_number = permutation_number
 
             # Go from back to front through the dimension
             for pos in reversed(self.shape):
@@ -110,12 +110,12 @@ class MinesweeperHelper:
                 # except base changes for each place.
 
                 # This permutation is just a remainder of division
-                this_permutation.append(remainding_number % pos)
-                # But you need to make sure you substract by
+                this_permutation.append(remaining_number % pos)
+                # But you need to make sure you subtract by
                 # the number in the latest position
-                remainding_number -= this_permutation[-1]
+                remaining_number -= this_permutation[-1]
                 # and divide by the latest base
-                remainding_number //= pos
+                remaining_number //= pos
 
             # Reverse the resulting list (as we started from the right side,
             # the smallest digits), and store it in the final list
@@ -136,12 +136,12 @@ class MinesweeperHelper:
         return True
 
     def cell_surroundings(self, cell):
-        ''' Returns a list of coordinates of neighbours of a cell
+        ''' Returns a list of coordinates of neighbors of a cell
         taking borders into account
         '''
-        # Dinamic programming: use buffer if the result is there
-        if cell in self.neighbours_cache:
-            return self.neighbours_cache[cell]
+        # Dynamic programming: use buffer if the result is there
+        if cell in self.neighbors_cache:
+            return self.neighbors_cache[cell]
 
         surroundings = []
 
@@ -149,7 +149,7 @@ class MinesweeperHelper:
         # as this is the same for all iterations
         powers = {j: 3**j for j in range(len(self.shape))}
 
-        # Iterate over 3 ** 'N of dimensions' postential neighbours
+        # Iterate over 3 ** 'N of dimensions' of potential neighbors
         for i in range(3 ** len(self.shape)):
 
             # Way to calculate all (1, -1, 0) for this permutation
@@ -161,13 +161,13 @@ class MinesweeperHelper:
                 continue
 
             # If resulting coords are valid
-            cell_with_offest = tuple([cell[i] + offset[i]
+            cell_with_offset = tuple([cell[i] + offset[i]
                                       for i in range(len(self.shape))])
-            if self.valid_coords(cell_with_offest):
-                surroundings.append(cell_with_offest)
+            if self.valid_coords(cell_with_offset):
+                surroundings.append(cell_with_offset)
 
         # Store in buffer, for future reuse
-        self.neighbours_cache[cell] = surroundings
+        self.neighbors_cache[cell] = surroundings
 
         return surroundings
 
@@ -257,7 +257,7 @@ class MinesweeperGame:
         Will be used when field is generated or if a mine was moved
         (because of a non-mine first move)
         '''
-        # Itrate over all cells
+        # Iterate over all cells
         for cell in self.helper.iterate_over_all_cells():
 
             # We only need non-mines cells
@@ -267,10 +267,10 @@ class MinesweeperGame:
             # Resent the number (in case it is a recount)
             self.field[cell] = 0
 
-            # Iteration over neighbours of a mine
-            # Add 1 for any mine neighbour
-            for neighbour in self.helper.cell_surroundings(cell):
-                if self.field[neighbour] == CELL_MINE:
+            # Iteration over neighbors of a mine
+            # Add 1 for any mine neighbor
+            for neighbor in self.helper.cell_surroundings(cell):
+                if self.field[neighbor] == CELL_MINE:
                     self.field[cell] += 1
 
     def has_covered(self):
@@ -319,15 +319,15 @@ class MinesweeperGame:
         while zeros:
 
             current_zero = zeros.pop()
-            for neighbour in self.helper.cell_surroundings(current_zero):
+            for neighbor in self.helper.cell_surroundings(current_zero):
 
                 # Uncover any covered cells
-                if self.uncovered[neighbour] == CELL_COVERED:
-                    self.uncovered[neighbour] = self.field[neighbour]
+                if self.uncovered[neighbor] == CELL_COVERED:
+                    self.uncovered[neighbor] = self.field[neighbor]
 
                     # If it happen to be a 0: add it to the zero list
-                    if self.field[neighbour] == 0:
-                        zeros.append(neighbour)
+                    if self.field[neighbor] == 0:
+                        zeros.append(neighbor)
 
     def safe_first_click(self, cell):
         ''' Check conditions for teh first click.
@@ -434,13 +434,14 @@ class MinesweeperGame:
         width = field_to_show.shape[0]
 
         # Characters to show for different statuses
+        # 80 is the highest possible number of neighbors (in a 4d game)
         characters_to_display = {**{
             CELL_MINE: "*",
             CELL_COVERED: " ",
             CELL_FALSE_MINE: "X",
             CELL_EXPLODED_MINE: "!",
             0: "."
-        }, **{i: str(i) for i in range(1, 9)}}
+        }, **{i: str(i) for i in range(1, 81)}}
 
         # Add all data to this string
         output = ""
@@ -459,7 +460,7 @@ class MinesweeperGame:
         # Top border
         output += "-" * (width * 2 + 3) + "\n"
 
-        # Iterate over all cells
+        # Iterate over all cells, row by row
         for row in range(height):
 
             # Left border
@@ -467,6 +468,7 @@ class MinesweeperGame:
                 output += f"{row:2} "
             output += "! "
 
+            # Iterate over each cell in a row
             for col in range(width):
 
                 cell_value = field_to_show[col, row]
@@ -555,7 +557,7 @@ class MinesweeperGame:
         return self.field2str(self.uncovered)
 
     def parse_input(self, string):
-        ''' For Command line play: parce string as
+        ''' For Command line play: parse string as
         [x y] | [M x y] | [A x y] ...
         - where x and y are 0-based coordinates
         - "M" to mark the mine
@@ -565,7 +567,7 @@ class MinesweeperGame:
         safe, mines = [], []
         mode, cell = None, []
 
-        # Break th estring by spaces
+        # Break the string by spaces
         for chunk in string.upper().split(" "):
 
             # We have a coordinate
@@ -583,7 +585,7 @@ class MinesweeperGame:
                     # Single mine
                     if mode == "M":
                         mines.append(cell)
-                    # Open around, add all surroudings
+                    # Open around, add all surroundings
                     elif mode == "A":
                         safe.extend(self.helper.cell_surroundings(cell))
                     # Single safe
@@ -591,7 +593,7 @@ class MinesweeperGame:
                         safe.append(cell)
                     mode, cell = False, []
 
-            # M and A modify the behaviour
+            # M and A modify the behavior
             elif chunk in ("M", "A"):
                 mode = chunk
 
@@ -602,7 +604,7 @@ def main():
     ''' Some tests for minesweeper sim
     '''
 
-    # Seed to generatethe game (None for random)
+    # Seed to generate the game (None for random)
     seed = None
 
     game = MinesweeperGame(settings=GAME_TEST, seed=seed)

@@ -1,6 +1,6 @@
-''' Class for the solver of minesweeper game.
-Game mechanics and some helper functions are taken from
-minesweeper-game.py
+''' Class for the solver of multidimensional minesweeper game.
+Game mechanics and some helper functions are imported from
+minesweeper_game.py
 '''
 
 import random
@@ -9,8 +9,8 @@ import minesweeper_game as ms
 
 
 class MineGroup:
-    ''' A minegroup is a set of cells that are known
-    to have a certian number of mines.
+    ''' A MineGroup is a set of cells that are known
+    to have a certain number of mines.
     For example "cell1, cell2, cell3 have exactly 1 mine" or
     "cell4, cell5 have at least 1 mine".
     This is a basic element for Groups and Subgroups solving methods.
@@ -26,7 +26,7 @@ class MineGroup:
         # Group type ("exactly", "no more than", "at least")
         self.group_type = group_type
 
-        # Calculate hash (for dedupliaction)
+        # Calculate hash (for deduplication)
         self.hash = self.calculate_hash()
 
         # Placeholder for cluster information
@@ -39,7 +39,7 @@ class MineGroup:
         return self.mines == 0
 
     def is_all_mines(self):
-        ''' If group has as many cellas mines - they are all mines
+        ''' If group has as many cells as mines - they are all mines
         '''
         return len(self.cells) == self.mines
 
@@ -70,7 +70,7 @@ class AllMineGroups:
     def __init__(self):
         # Hashes for deduplication
         self.hashes = set()
-        # List of minegroups
+        # List of MineGroups
         self.mine_groups = []
 
     def reset(self):
@@ -161,10 +161,10 @@ class AllMineGroups:
 
 
 class CellCluster:
-    ''' CellCluster is a group of cells connected together by an overlaping
+    ''' CellCluster is a group of cells connected together by an overlapping
     list of groups. In other words mine/safe in any of the cell, can
     potentially trigger safe/mine in any other cell of the cluster.
-    Is a basic class for CSP (constrait satisfaction problem) method
+    Is a basic class for CSP (constraint satisfaction problem) method
     '''
 
     def __init__(self, group=None):
@@ -204,13 +204,13 @@ class CellCluster:
 
     @staticmethod
     def all_mines_positions(cells_count, mines_to_set):
-        ''' Generate all permuations for "Choose k from n",
+        ''' Generate all permutations for "Choose k from n",
         which is equivalent to all possible ways mines are
         located in the cells.
         Result is a list of tuples like (False, False, True, False),
         indicating if the item was chosen (if there is a mine in the cell).
         For example, for generate_mines_permutations(2, 1) the output is:
-        [(True, False), (Fasle, True)]
+        [(True, False), (False, True)]
         '''
 
         def recursive_choose_generator(current_combination, mines_to_set):
@@ -236,7 +236,12 @@ class CellCluster:
         return result
 
     def solve_csp(self):
-        ''' Use CSP to find safe cells and mines in the cluster
+        ''' Use CSP to find the solution to the CSP. Solution is the list of
+        all possible mine/safe variations that fits all groups' condition.
+        Solution is in the form of a list of Tru/False (Tru for mine,
+        False for safe), with positions in the solution corresponding to cells
+        in self.cells list. SOlution will be stored in self.solutions
+        Will result in empty solution if the initial cluster is too big.
         '''
         # It gets too slow and inefficient when
         # - There are too many, but clusters but not enough groups
@@ -334,7 +339,7 @@ class MinesweeperSolver:
     ''' Methods related to solving minesweeper game. '''
 
     def __init__(self, settings=ms.GAME_BEGINNER):
-        ''' Initiate the solver. Only requred game settings
+        ''' Initiate the solver. Only required game settings
         '''
 
         # Shape, a tuple of dimension sizes
@@ -342,10 +347,10 @@ class MinesweeperSolver:
         # N umber of total mines in the game
         self.total_mines = settings.mines
 
-        # Initiate helper (itiration through all cells, neighbours etc)
+        # Initiate helper (iteration through all cells, neighbors etc)
         self.helper = ms.MinesweeperHelper(self.shape)
 
-        # Placeholder for thej field. Will be populated by self.solve()
+        # Placeholder for the field. Will be populated by self.solve()
         self.field = None
 
         # Placeholder for all groups. Recalculated for each solver run
@@ -389,28 +394,28 @@ class MinesweeperSolver:
 
             # For them we'll need to know two things:
             # What are the uncovered cells around it
-            covered_neighbours = []
-            # And how many "Acive" (that is, minus marked)
+            covered_neighbors = []
+            # And how many "Active" (that is, minus marked)
             # mines are still there
             active_mines = self.field[cell]
 
-            # Go through the neighbours
-            for neighbour in self.helper.cell_surroundings(cell):
+            # Go through the neighbors
+            for neighbor in self.helper.cell_surroundings(cell):
                 # Collect all covered cells
-                if self.field[neighbour] == ms.CELL_COVERED:
-                    covered_neighbours.append(neighbour)
-                # Substruct all marked mines
-                if self.field[neighbour] == ms.CELL_MINE:
+                if self.field[neighbor] == ms.CELL_COVERED:
+                    covered_neighbors.append(neighbor)
+                # Subtract all marked mines
+                if self.field[neighbor] == ms.CELL_MINE:
                     active_mines -= 1
 
             # If the list of covered cells is not empty:
             # store it in the self.groups
-            if covered_neighbours:
-                new_group = MineGroup(covered_neighbours, active_mines)
+            if covered_neighbors:
+                new_group = MineGroup(covered_neighbors, active_mines)
                 self.groups.add(new_group)
 
     def generate_clusters(self):
-        '''Populate self.clsters with cell clusters
+        '''Populate self.clusters with cell clusters
         '''
         # Reset clusters
         self.clusters = []
@@ -427,7 +432,7 @@ class MinesweeperSolver:
 
                 # Look through all groups
                 for group in self.groups:
-                    # If it overlanps with this group and not part of any
+                    # If it overlaps with this group and not part of any
                     # other cluster - add this group
                     if group.group_type == "exactly" and \
                        group.belong_to_cluster is None and \
@@ -468,7 +473,7 @@ class MinesweeperSolver:
         '''
 
         # For that, we need two conditions:
-        # 1. A is a subset of B (only checks this way, so extarnal function
+        # 1. A is a subset of B (only checks this way, so external function
         # need to make sure this function called both ways).
         if group_a.cells.issubset(group_b.cells):
 
@@ -484,11 +489,9 @@ class MinesweeperSolver:
     @staticmethod
     def deduce_mines(group_a, group_b):
         ''' Given two mine groups, deduce if there are any mines.
+        Similar to deduce_safe, but the condition is different.
         '''
 
-        # For that, we need two conditions:
-        # 1. A is a subset of B (only checks this way, so extarnal function
-        # need to make sure this function called both ways).
         if group_a.cells.issubset(group_b.cells):
 
             # 2. If difference in number of cells is the same as
@@ -508,7 +511,7 @@ class MinesweeperSolver:
         '''
         safe, mines = [], []
 
-        # Cross-check all-withall groups
+        # Cross-check all-with-all groups
         for group_a in self.groups:
             for group_b in self.groups:
 

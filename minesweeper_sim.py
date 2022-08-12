@@ -1,4 +1,5 @@
-''' Simulator that plays multiple minesweeepr games
+''' Simulator program that plays multiple minesweeper games.
+The game is from minesweeper_game, the solver is from minesweeper_solver
 '''
 
 import time
@@ -6,7 +7,7 @@ import math
 import random
 
 import minesweeper_game as ms
-import minesweeper_solver as msolve
+import minesweeper_solver as ms_solver
 
 
 class MinesweeperSim:
@@ -40,7 +41,7 @@ class MinesweeperSim:
 
         # Start the game, using one of the seeds
         game = ms.MinesweeperGame(self.settings, self.game_seeds.pop())
-        solver = msolve.MinesweeperSolver(self.settings)
+        solver = ms_solver.MinesweeperSolver(self.settings)
 
         while game.status == ms.STATUS_ALIVE:
 
@@ -61,21 +62,21 @@ class MinesweeperSim:
         '''
         for _ in range(self.runs):
             self.results.append(self.one_game())
-        return self.winrate()
+        return self.win_rate()
 
-    def winrate(self):
-        ''' Return current winrate
+    def win_rate(self):
+        ''' Return current win_rate
         '''
         return self.results.count(ms.STATUS_WON) / len(self.results)
 
     def margin_of_error(self):
         ''' Current margin of error (95% confidence).
-        In percetange points (+- that many %).
+        In percentage points (+- that many %).
         '''
         runs = len(self.results)
-        winrate = self.winrate()
+        win_rate = self.win_rate()
         z_parameter = 1.95  # Corresponds to 95% confidence
-        return z_parameter * math.sqrt(winrate * (1 - winrate) / runs)
+        return z_parameter * math.sqrt(win_rate * (1 - win_rate) / runs)
 
     def display_stats(self):
         ''' Print out the stats of teh simulation
@@ -86,8 +87,8 @@ class MinesweeperSim:
 
         output = ""
 
-        winrate = self.winrate()
-        output += f"Win rate: {winrate:.1%}±{self.margin_of_error():.1%}\n"
+        win_rate = self.win_rate()
+        output += f"Win rate: {win_rate:.1%}±{self.margin_of_error():.1%}\n"
         output += f"Total time: {self.spent_time:.0f}s, "
         output += f"Time per game: {self.spent_time / self.runs:.2f}s, "
         output += f"Games per sec: {self.runs / self.spent_time:.2f}s\n"
@@ -114,7 +115,7 @@ def main():
     runs = 100
 
     presets = (ms.GAME_BEGINNER, ms.GAME_INTERMEDIATE, ms.GAME_EXPERT,
-               ms.GAME_3D_EASY, ms.GAME_3D_MEDUIM, ms.GAME_3D_HARD,
+               ms.GAME_3D_EASY, ms.GAME_3D_MEDIUM, ms.GAME_3D_HARD,
                ms.GAME_4D_EASY, ms.GAME_4D_MEDIUM, ms.GAME_4D_HARD,
                ms.GAME_4D_HARDER)
     # only_2d = (ms.GAME_BEGINNER, ms.GAME_INTERMEDIATE, ms.GAME_EXPERT)
