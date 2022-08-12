@@ -385,6 +385,9 @@ class MinesweeperSolver:
         # Placeholder for the field. Will be populated by self.solve()
         self.field = None
 
+        # Placeholder for the number of remaining mines
+        self.remaining_mines = None
+
         # Placeholder for all groups. Recalculated for each solver run
         self.groups = AllMineGroups()
 
@@ -645,6 +648,25 @@ class MinesweeperSolver:
 
         return list(set(safe)), list(set(mines))
 
+    def calculate_remaining_mines(self):
+        ''' Based on mines we know about, calculate how many are still
+        on the filed. Populate self.remaining_mines
+        '''
+        self.remaining_mines = self.total_mines
+        for cell in self.helper.iterate_over_all_cells():
+            if self.field[cell] == ms.CELL_MINE:
+                self.remaining_mines -= 1
+
+    def calculate_background_probabilities(self):
+        ''' Background probability is all mines / all covered cells .
+        It is quite crude and often inaccurate, but sometimes it is better
+        to click deep into the unknown rather than try 50/50 guess.
+        '''
+        covered_cells = self.get_all_covered()
+        background_probability = self.remaining_mines / len(covered_cells)
+        for cell in covered_cells:
+            self.mine_probabilities[cell] = background_probability
+
     def calculate_probabilities_for_groups(self):
         ''' Populate self.mine_probabilities, based on groups data
         Each cell's probability is: max(group_mines / group_cells, ...),
@@ -660,11 +682,17 @@ class MinesweeperSolver:
             group_probability = group.mines / len(group.cells)
 
             for cell in group.cells:
-                # Result should be the max of group_probability and existing
-                # number in cell
-                if cell not in self.mine_probabilities or \
-                   group_probability > self.mine_probabilities[cell]:
-                    self.mine_probabilities[cell] = group_probability
+                # Overwrite the probability result
+                self.mine_probabilities[cell] = group_probability
+
+    def calculate_probabilities(self):
+        ''' Calculate probabilities of mines (and populate
+        self.mine_probabilities, using several methods
+        '''
+        # Background probability: all remaining mines on all covered cells
+        self.calculate_background_probabilities()
+        # Based on mines in groups
+        self.calculate_probabilities_for_groups()
 
     def pick_lowest_probability(self):
         ''' Pick and return the cell(s) with the lowest mine probability,
@@ -740,9 +768,15 @@ class MinesweeperSolver:
             self.last_move_info = ("CSP", None)
             return safe, mines
 
-        # Probability based methods
-        # Probability based on groups
-        self.calculate_probabilities_for_groups()
+        # For further methods we need to know how the number of remaining mines
+        self.calculate_remaining_mines()
+
+        # Calculate mine probability using various methods
+        # TODO: There is something up with this, result for beginner is lower
+        # than just a random click
+        # Also, I think (7, 7, 7) hanged
+        self.calculate_probabilities()
+        # Pick a cell that is least likely a mine
         lucky_cells, chance = self.pick_lowest_probability()
 
         if lucky_cells:
