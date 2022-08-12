@@ -45,7 +45,7 @@ class MinesweeperSim:
 
         while game.status == ms.STATUS_ALIVE:
 
-            safe, mines = solver.solve(game.uncovered)
+            safe, mines, _ = solver.solve(game.uncovered)
             if verbose:
                 print(f"Player: safe={safe}, mines={mines}")
             game.make_a_move(safe, mines)

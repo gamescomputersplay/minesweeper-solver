@@ -185,6 +185,9 @@ class CellCluster:
         # Positions corresponds to self.cells
         self.solutions = []
 
+        # Placeholder for the resulting frequencies of mines in each cell
+        self.frequencies = {}
+
     def add(self, group):
         ''' Adding group to a cluster (assume they overlap).
         Add group's cells to the set of cells
@@ -235,7 +238,7 @@ class CellCluster:
         recursive_choose_generator(all_cells_false, mines_to_set)
         return result
 
-    def solve_csp(self):
+    def solve_cluster(self):
         ''' Use CSP to find the solution to the CSP. Solution is the list of
         all possible mine/safe variations that fits all groups' condition.
         Solution is in the form of a list of Tru/False (Tru for mine,
@@ -251,8 +254,8 @@ class CellCluster:
         # Do not solve such clusters
         if len(self.cells_set) / len(self.groups) > 12 or \
            len(self.cells_set) > 40 or \
-           max([math.comb(len(group.cells), group.mines)
-                for group in self.groups]) > 1001:
+           max(math.comb(len(group.cells), group.mines)
+                for group in self.groups) > 1001:
             return
 
         # We need to fix the order of cells, for that we populate self.cells
@@ -317,6 +320,35 @@ class CellCluster:
             solutions = updated_solutions
 
         self.solutions = solutions
+
+    def calculate_frequencies(self):
+        ''' Once the solution is there, we can calculate frequencies:
+        how often is a cell a mine in all solutions. Populates the
+        self.frequencies with a dict {cell: frequency, ... },
+        where frequency ranges from 0 (100% safe) to 1 (100% mine).
+        '''
+        # Can't do anything if there are no solutions
+        if not self.solutions:
+            return
+
+        for position, cell in enumerate(self.cells):
+            count_mines = 0
+            for solution in self.solutions:
+                if solution[position]:
+                    count_mines += 1
+            self.frequencies[cell] = count_mines / len(self.solutions)
+
+    def safe_cells(self):
+        ''' Return list of guaranteed safe cells (0 in self.frequencies)
+        '''
+        safe = [cell for cell, frequency in self.frequencies.items() if frequency == 0]
+        return safe
+
+    def mine_cells(self):
+        '''Return list of guaranteed mines (1 in self.frequencies)
+        '''
+        mines = [cell for cell, frequency in self.frequencies.items() if frequency == 1]
+        return mines
 
     def calculate_hash(self):
         ''' Hash of a cluster. To check if we already dealt with this one
@@ -581,6 +613,8 @@ class MinesweeperSolver:
         ''' CSP method. We look at the overlapping groups to check if some
         cells are always safe or mines in all valid solutions.
         '''
+        safe, mines = [], []
+
         # Generate clusters
         self.generate_clusters()
         for cluster in self.clusters:
@@ -590,13 +624,17 @@ class MinesweeperSolver:
                 continue
 
             # Solve the cluster
-            # print(f"CSP! Cluster: {cluster}")
-            cluster.solve_csp()
+            cluster.solve_cluster()
+            cluster.calculate_frequencies()
+            #if 0 in list(cluster.frequencies.values()) or 1 in list(cluster.frequencies.values()):
+            #    print(f"CSP! Freq: {cluster.frequencies}")
+
+            safe.extend(cluster.safe_cells())
+            mines.extend(cluster.mine_cells())
 
             # Save cluster's hash in history for deduplication
             self.clusters_history.add(cluster.calculate_hash())
 
-        safe, mines = [], []
         return list(set(safe)), list(set(mines))
 
     def solve(self, field):
@@ -604,7 +642,8 @@ class MinesweeperSolver:
         Go through various solving methods and return safe and mines lists
         as long as any of the methods return results
         In: the field (what has been uncovered so far).
-        Out: two lists: [safe cells], [mine cells]
+        Out: two lists: [safe cells], [mine cells],
+        and string, telling which method was used
         '''
         # Store field as an instance variable
         self.field = field
@@ -613,7 +652,7 @@ class MinesweeperSolver:
 
         # 0. First click on the "all 0" corner
         if self.helper.are_all_covered(self.field):
-            return [tuple(0 for _ in range(len(self.shape))), ], None
+            return [tuple(0 for _ in range(len(self.shape))), ], None, "First click"
 
         # Generate groups (main data for basic solving methods)
         self.generate_groups()
@@ -622,29 +661,29 @@ class MinesweeperSolver:
         #################
         safe, mines = self.method_naive()
         if safe or mines:
-            return safe, mines
+            return safe, mines, "Naive"
 
         # 2. Groups Method
         ##################
         safe, mines = self.method_groups()
         if safe or mines:
-            return safe, mines
+            return safe, mines, "Groups"
 
         # 3. Sub groups Method
         ######################
         safe, mines = self.method_subgroups()
         if safe or mines:
-            return safe, mines
+            return safe, mines, "Subgroups"
 
         # 4. CSP method
         # (stands for Constraint Satisfaction Problem)
         ######################
         safe, mines = self.method_csp()
         if safe or mines:
-            return safe, mines
+            return safe, mines, "CSP"
 
         # If there is nothing we can do: return a random cell
-        return [self.pick_a_random_cell(covered_cells), ], None
+        return [self.pick_a_random_cell(covered_cells), ], None, "Random"
 
 
 def main():
@@ -659,8 +698,8 @@ def main():
 
     while game.status == ms.STATUS_ALIVE:
 
-        safe, mines = solver.solve(game.uncovered)
-        print(f"Move: Safe {safe}, Mines {mines}")
+        safe, mines, method = solver.solve(game.uncovered)
+        print(f"{method}: Safe {safe}, Mines {mines}")
         game.make_a_move(safe, mines)
         print(game)
 
