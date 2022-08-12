@@ -341,13 +341,13 @@ class CellCluster:
     def safe_cells(self):
         ''' Return list of guaranteed safe cells (0 in self.frequencies)
         '''
-        safe = [cell for cell, frequency in self.frequencies.items() if frequency == 0]
+        safe = [cell for cell, freq in self.frequencies.items() if freq == 0]
         return safe
 
     def mine_cells(self):
         '''Return list of guaranteed mines (1 in self.frequencies)
         '''
-        mines = [cell for cell, frequency in self.frequencies.items() if frequency == 1]
+        mines = [cell for cell, freq in self.frequencies.items() if freq == 1]
         return mines
 
     def calculate_hash(self):
@@ -394,6 +394,15 @@ class MinesweeperSolver:
         # History of clusters we already processed, so we won't have to
         # solved them again (they can be quite time consuming)
         self.clusters_history = set()
+
+        # Placeholder for mine probability data
+        # {cell: probability_of_it_being_a_mine}
+        self.mine_probabilities = {}
+
+        # Info about last move. Normally it would be a tuple
+        # ("method name", probability). Probability make sense if it
+        # was "Random"
+        self.last_move_info = None
 
     def get_all_covered(self):
         ''' Return the list of all covered cells
@@ -626,9 +635,8 @@ class MinesweeperSolver:
             # Solve the cluster
             cluster.solve_cluster()
             cluster.calculate_frequencies()
-            #if 0 in list(cluster.frequencies.values()) or 1 in list(cluster.frequencies.values()):
-            #    print(f"CSP! Freq: {cluster.frequencies}")
 
+            # Get safe cells and mines from cluster
             safe.extend(cluster.safe_cells())
             mines.extend(cluster.mine_cells())
 
@@ -637,22 +645,68 @@ class MinesweeperSolver:
 
         return list(set(safe)), list(set(mines))
 
+    def calculate_probabilities_for_groups(self):
+        ''' Populate self.mine_probabilities, based on groups data
+        Each cell's probability is: max(group_mines / group_cells, ...),
+        for all cells it is in.
+        '''
+        self.mine_probabilities = {}
+        for group in self.groups:
+            # We only need "exactly" type of groups
+            if group.group_type != "exactly":
+                continue
+
+            # Probability of each mine in teh group
+            group_probability = group.mines / len(group.cells)
+
+            for cell in group.cells:
+                # Result should be the max of group_probability and existing
+                # number in cell
+                if cell not in self.mine_probabilities or \
+                   group_probability > self.mine_probabilities[cell]:
+                    self.mine_probabilities[cell] = group_probability
+
+    def pick_lowest_probability(self):
+        ''' Pick and return the cell(s) with the lowest mine probability,
+        from the self.mine_probabilities.
+        Also, return lowest probability predicted for this cell.
+        '''
+        lowest_probability = None
+        least_likely_cells = []
+
+        # Go through the probability dict
+        for cell, probability in self.mine_probabilities.items():
+
+            # If found a new best probability: re-start the best list
+            if lowest_probability is None or probability < lowest_probability:
+                least_likely_cells = [cell, ]
+                lowest_probability = probability
+
+            # Or if it is the same probability - add to the list
+            elif probability == lowest_probability:
+                least_likely_cells.append(cell)
+
+        return least_likely_cells, lowest_probability
+
     def solve(self, field):
         ''' Main solving function.
         Go through various solving methods and return safe and mines lists
         as long as any of the methods return results
-        In: the field (what has been uncovered so far).
-        Out: two lists: [safe cells], [mine cells],
-        and string, telling which method was used
+        In:
+        - the field (what has been uncovered so far).
+        Out:
+        - list of safe cells
+        - list of mines
+        - which method was used
+        - if it was "Random", the predicted chance
         '''
         # Store field as an instance variable
         self.field = field
 
-        covered_cells = self.get_all_covered()
-
         # 0. First click on the "all 0" corner
         if self.helper.are_all_covered(self.field):
-            return [tuple(0 for _ in range(len(self.shape))), ], None, "First click"
+            self.last_move_info = ("First click", None)
+            return [tuple(0 for _ in range(len(self.shape))), ], None
 
         # Generate groups (main data for basic solving methods)
         self.generate_groups()
@@ -661,29 +715,45 @@ class MinesweeperSolver:
         #################
         safe, mines = self.method_naive()
         if safe or mines:
-            return safe, mines, "Naive"
+            self.last_move_info = ("Naive", None)
+            return safe, mines
 
         # 2. Groups Method
         ##################
         safe, mines = self.method_groups()
         if safe or mines:
-            return safe, mines, "Groups"
+            self.last_move_info = ("Groups", None)
+            return safe, mines
 
         # 3. Sub groups Method
         ######################
         safe, mines = self.method_subgroups()
         if safe or mines:
-            return safe, mines, "Subgroups"
+            self.last_move_info = ("Subgroups", None)
+            return safe, mines
 
         # 4. CSP method
         # (stands for Constraint Satisfaction Problem)
         ######################
         safe, mines = self.method_csp()
         if safe or mines:
-            return safe, mines, "CSP"
+            self.last_move_info = ("CSP", None)
+            return safe, mines
 
-        # If there is nothing we can do: return a random cell
-        return [self.pick_a_random_cell(covered_cells), ], None, "Random"
+        # Probability based methods
+        # Probability based on groups
+        self.calculate_probabilities_for_groups()
+        lucky_cells, chance = self.pick_lowest_probability()
+
+        if lucky_cells:
+            self.last_move_info = ("Random", chance)
+            return [self.pick_a_random_cell(lucky_cells), ], None
+
+        # Until the count method implemented, there is a chance of
+        # "exclave" cells. This is a catch-all for that
+        covered_cells = self.get_all_covered()
+        self.last_move_info = ("Last Resort", None)
+        return [self.pick_a_random_cell(covered_cells), ], None
 
 
 def main():
@@ -698,8 +768,16 @@ def main():
 
     while game.status == ms.STATUS_ALIVE:
 
-        safe, mines, method = solver.solve(game.uncovered)
-        print(f"{method}: Safe {safe}, Mines {mines}")
+        safe, mines = solver.solve(game.uncovered)
+        method, chance = solver.last_move_info
+
+        chance_str = ""
+        if chance is not None:
+            chance_str = f"Mine chance: {chance}, "
+
+        print(f"Method: {method}, {chance_str}" +
+              f"Safe: {safe}, Mines: {mines}")
+
         game.make_a_move(safe, mines)
         print(game)
 
