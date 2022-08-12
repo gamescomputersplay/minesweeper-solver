@@ -672,7 +672,6 @@ class MinesweeperSolver:
         Each cell's probability is: max(group_mines / group_cells, ...),
         for all cells it is in.
         '''
-        self.mine_probabilities = {}
         for group in self.groups:
             # We only need "exactly" type of groups
             if group.group_type != "exactly":
@@ -689,6 +688,8 @@ class MinesweeperSolver:
         ''' Calculate probabilities of mines (and populate
         self.mine_probabilities, using several methods
         '''
+        # Reset probabillities
+        self.mine_probabilities = {}
         # Background probability: all remaining mines on all covered cells
         self.calculate_background_probabilities()
         # Based on mines in groups
@@ -772,9 +773,6 @@ class MinesweeperSolver:
         self.calculate_remaining_mines()
 
         # Calculate mine probability using various methods
-        # TODO: There is something up with this, result for beginner is lower
-        # than just a random click
-        # Also, I think (7, 7, 7) hanged
         self.calculate_probabilities()
         # Pick a cell that is least likely a mine
         lucky_cells, chance = self.pick_lowest_probability()
@@ -797,7 +795,7 @@ def main():
     settings = ms.GAME_TEST
     settings = ms.GAME_BEGINNER
 
-    game = ms.MinesweeperGame(settings, seed=0)
+    game = ms.MinesweeperGame(settings, seed=0.612783105040712)
     solver = MinesweeperSolver(settings)
 
     while game.status == ms.STATUS_ALIVE:
