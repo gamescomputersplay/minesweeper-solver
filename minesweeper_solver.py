@@ -188,6 +188,10 @@ class CellCluster:
         # Placeholder for the resulting frequencies of mines in each cell
         self.frequencies = {}
 
+        # Placeholder for solution weight - how probable is this solution
+        # based on the number of mines in it
+        self.solution_weights = []
+
     def add(self, group):
         ''' Adding group to a cluster (assume they overlap).
         Add group's cells to the set of cells
@@ -238,7 +242,7 @@ class CellCluster:
         recursive_choose_generator(all_cells_false, mines_to_set)
         return result
 
-    def solve_cluster(self):
+    def solve_cluster(self, remaining_mines):
         ''' Use CSP to find the solution to the CSP. Solution is the list of
         all possible mine/safe variations that fits all groups' condition.
         Solution is in the form of a list of Tru/False (Tru for mine,
@@ -319,13 +323,19 @@ class CellCluster:
 
             solutions = updated_solutions
 
-        self.solutions = solutions
+        # Check if there are no more mines in solutions than remaining mines
+        for solution in solutions:
+            mine_count = sum(1 for mine in solution if mine)
+            if mine_count <= remaining_mines:
+                self.solutions.append(solution)
 
     def calculate_frequencies(self):
         ''' Once the solution is there, we can calculate frequencies:
         how often is a cell a mine in all solutions. Populates the
         self.frequencies with a dict {cell: frequency, ... },
         where frequency ranges from 0 (100% safe) to 1 (100% mine).
+        Also, use weights  (self.solution_weights) - it shows in how many
+        cases this solution is likely to appear.
         '''
         # Can't do anything if there are no solutions
         if not self.solutions:
@@ -333,10 +343,14 @@ class CellCluster:
 
         for position, cell in enumerate(self.cells):
             count_mines = 0
-            for solution in self.solutions:
+            for solution_n, solution in enumerate(self.solutions):
+                # Mine count takes into account the weight of teh solution
+                # So if fact it is 1 * weight
                 if solution[position]:
-                    count_mines += 1
-            self.frequencies[cell] = count_mines / len(self.solutions)
+                    count_mines += self.solution_weights[solution_n]
+            # Total in this case - not the number of solutions,
+            # but weight of all solutions
+            self.frequencies[cell] = count_mines / sum(self.solution_weights)
 
     def safe_cells(self):
         ''' Return list of guaranteed safe cells (0 in self.frequencies)
@@ -360,6 +374,22 @@ class CellCluster:
         for_hash = tuple(for_hash)
         # Return hash
         return hash(for_hash)
+
+    def calculate_solution_weights(self, covered_cells, remaining_mines):
+        ''' Calculate how probable each solution  is,
+        if there are total_mines left in the field. That is,
+        how many combinateions of mines are possible with this solution.
+        Populate self.solution_weights with the results
+        '''
+        self.solution_weights = []
+
+        # For each solution we calculte how  many combination are possible
+        # with the remianing mines on the remaining cells
+        for solution in self.solutions:
+            solution_mines = sum(1 for mine in solution if mine)
+            solution_comb = math.comb(len(covered_cells) - len(solution),
+                                      remaining_mines - solution_mines)
+            self.solution_weights.append(solution_comb)
 
     def __str__(self):
         output = f"Cluster with {len(self.groups)} group(s) "
@@ -388,6 +418,9 @@ class MinesweeperSolver:
         # Placeholder for the number of remaining mines
         self.remaining_mines = None
 
+        # List of all covered cells
+        self.covered_cells = []
+
         # Placeholder for all groups. Recalculated for each solver run
         self.groups = AllMineGroups()
 
@@ -407,14 +440,14 @@ class MinesweeperSolver:
         # was "Random"
         self.last_move_info = None
 
-    def get_all_covered(self):
+    def generate_all_covered(self):
         ''' Return the list of all covered cells
         '''
         all_covered = []
         for cell in self.helper.iterate_over_all_cells():
             if self.field[cell] == ms.CELL_COVERED:
                 all_covered.append(cell)
-        return all_covered
+        self.covered_cells = all_covered
 
     @staticmethod
     def pick_a_random_cell(cells):
@@ -636,7 +669,9 @@ class MinesweeperSolver:
                 continue
 
             # Solve the cluster
-            cluster.solve_cluster()
+            cluster.solve_cluster(self.remaining_mines)
+            cluster.calculate_solution_weights(self.covered_cells,
+                                               self.remaining_mines)
             cluster.calculate_frequencies()
 
             # Get safe cells and mines from cluster
@@ -657,43 +692,55 @@ class MinesweeperSolver:
             if self.field[cell] == ms.CELL_MINE:
                 self.remaining_mines -= 1
 
-    def calculate_background_probabilities(self):
-        ''' Background probability is all mines / all covered cells .
-        It is quite crude and often inaccurate, but sometimes it is better
-        to click deep into the unknown rather than try 50/50 guess.
-        '''
-        covered_cells = self.get_all_covered()
-        background_probability = self.remaining_mines / len(covered_cells)
-        for cell in covered_cells:
-            self.mine_probabilities[cell] = background_probability
-
-    def calculate_probabilities_for_groups(self):
-        ''' Populate self.mine_probabilities, based on groups data
-        Each cell's probability is: max(group_mines / group_cells, ...),
-        for all cells it is in.
-        '''
-        for group in self.groups:
-            # We only need "exactly" type of groups
-            if group.group_type != "exactly":
-                continue
-
-            # Probability of each mine in teh group
-            group_probability = group.mines / len(group.cells)
-
-            for cell in group.cells:
-                # Overwrite the probability result
-                self.mine_probabilities[cell] = group_probability
-
     def calculate_probabilities(self):
         ''' Calculate probabilities of mines (and populate
         self.mine_probabilities, using several methods
         '''
+
+        def calculate_background_probabilities(self):
+            ''' Background probability is all mines / all covered cells .
+            It is quite crude and often inaccurate, but sometimes it is better
+            to click deep into the unknown rather than try 50/50 guess.
+            '''
+            covered_cells = self.covered_cells
+            background_probability = self.remaining_mines / len(covered_cells)
+            for cell in covered_cells:
+                self.mine_probabilities[cell] = background_probability
+
+        def calculate_probabilities_for_groups(self):
+            ''' Populate self.mine_probabilities, based on groups data
+            Each cell's probability is: max(group_mines / group_cells, ...),
+            for all cells it is in.
+            '''
+            for group in self.groups:
+                # We only need "exactly" type of groups
+                if group.group_type != "exactly":
+                    continue
+
+                # Probability of each mine in teh group
+                group_probability = group.mines / len(group.cells)
+
+                for cell in group.cells:
+                    # Overwrite the probability result
+                    self.mine_probabilities[cell] = group_probability
+
+        def calculate_probabilities_csp(self):
+            ''' Calculate mine possibilities based on CSP
+            clusters
+            '''
+            for cluster in self.clusters:
+                for cell, frequency in cluster.frequencies.items():
+                    # Overwrite the probability result
+                    self.mine_probabilities[cell] = frequency
+
         # Reset probabillities
         self.mine_probabilities = {}
         # Background probability: all remaining mines on all covered cells
-        self.calculate_background_probabilities()
+        calculate_background_probabilities(self)
         # Based on mines in groups
-        self.calculate_probabilities_for_groups()
+        calculate_probabilities_for_groups(self)
+        # Based on CSP solutions
+        calculate_probabilities_csp(self)
 
     def pick_lowest_probability(self):
         ''' Pick and return the cell(s) with the lowest mine probability,
@@ -761,6 +808,11 @@ class MinesweeperSolver:
             self.last_move_info = ("Subgroups", None)
             return safe, mines
 
+        # For further methods we need to know how the number of remaining mines
+        self.calculate_remaining_mines()
+        # Ald have a list of all covered cells
+        self.generate_all_covered()
+
         # 4. CSP method
         # (stands for Constraint Satisfaction Problem)
         ######################
@@ -768,9 +820,6 @@ class MinesweeperSolver:
         if safe or mines:
             self.last_move_info = ("CSP", None)
             return safe, mines
-
-        # For further methods we need to know how the number of remaining mines
-        self.calculate_remaining_mines()
 
         # Calculate mine probability using various methods
         self.calculate_probabilities()
@@ -783,9 +832,8 @@ class MinesweeperSolver:
 
         # Until the count method implemented, there is a chance of
         # "exclave" cells. This is a catch-all for that
-        covered_cells = self.get_all_covered()
         self.last_move_info = ("Last Resort", None)
-        return [self.pick_a_random_cell(covered_cells), ], None
+        return [self.pick_a_random_cell(self.covered_cells), ], None
 
 
 def main():
@@ -795,7 +843,7 @@ def main():
     settings = ms.GAME_TEST
     settings = ms.GAME_BEGINNER
 
-    game = ms.MinesweeperGame(settings, seed=0.612783105040712)
+    game = ms.MinesweeperGame(settings, seed=0)
     solver = MinesweeperSolver(settings)
 
     while game.status == ms.STATUS_ALIVE:
