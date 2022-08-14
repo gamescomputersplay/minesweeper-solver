@@ -5,9 +5,14 @@ The game is from minesweeper_game, the solver is from minesweeper_solver
 import time
 import math
 import random
+from tqdm import tqdm
 
 import minesweeper_game as ms
 import minesweeper_solver as ms_solver
+
+# Whether to display progress bar for a simulation
+# May have issues on some IDEs
+USE_PROGRESS_BAR = True
 
 
 class MinesweeperSim:
@@ -29,10 +34,8 @@ class MinesweeperSim:
         # calls in the solver would not affect it).
         self.game_seeds = [random.random() for _ in range(self.runs)]
 
-        # Run the simulation (with timing)
-        start_time = time.time()
-        self.run()
-        self.spent_time = time.time() - start_time
+        # Placeholder for timimg
+        self.spent_time = None
 
     def one_game(self, verbose=False):
         ''' Playing one game.
@@ -60,8 +63,17 @@ class MinesweeperSim:
     def run(self):
         ''' Running the simulation
         '''
-        for _ in range(self.runs):
+        # Choose if we need to display a progress bar
+        if USE_PROGRESS_BAR:
+            iterator = tqdm(range(self.runs))
+        else:
+            iterator = range(self.runs)
+
+        # Run the simulation (with timing)
+        start_time = time.time()
+        for _ in iterator:
             self.results.append(self.one_game())
+        self.spent_time = time.time() - start_time
         return self.win_rate()
 
     def win_rate(self):
@@ -124,6 +136,7 @@ def main():
 
         simulation = MinesweeperSim(runs, settings, seed)
         print(simulation)
+        simulation.run()
         print(simulation.display_stats())
 
 
