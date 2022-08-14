@@ -56,7 +56,7 @@ class MineGroup:
     def __str__(self):
         ''' List cells, mines and group type
         '''
-        out = "Cell(s) "
+        out = f"Cell(s) ({len(self.cells)}) "
         out += ",".join([str(cell) for cell in self.cells])
         out += f" have {self.group_type} {self.mines} mines"
         return out
@@ -764,6 +764,61 @@ class MinesweeperSolver:
 
         return least_likely_cells, lowest_probability
 
+    def method_coverage(self):
+        ''' Calculate the cells and mines of "unknown" area, that is covered
+        area minuswhat we know from groups. Used in method "count" and
+        allowes for better background probability calculations.
+        '''
+        # Initiate by having a mutable copy of all cells and all mines
+        accounted_cells = set()
+        accounted_mines = 0
+
+        while True:
+            # The idea is to find a group that has a largest number of
+            # unaccounted cells
+            best_count = None
+            bestgroup = None
+            for group in self.groups:
+
+                # We only need "exactly" groups
+                if group.group_type != "exactly":
+                    continue
+
+                # If group overlaps with what we have so far -
+                # we don't need such group
+                if accounted_cells.intersection(group.cells):
+                    continue
+
+                # Find the biggest group that we haven't touched yet
+                if best_count is None or len(group.cells) > best_count:
+                    best_count = len(group.cells)
+                    bestgroup = group
+
+            # We have a matching group
+            if bestgroup is not None:
+                # Cells froom that group from now on are accounted for
+                accounted_cells = accounted_cells.union(bestgroup.cells)
+                # And so are  mines
+                accounted_mines += bestgroup.mines
+            # No such  group was found: coverage is done
+            else:
+                break
+
+        # unaccounted cells are all minus accounted
+        unaccounted_cells = set(self.covered_cells).difference(accounted_cells)
+        # Same with mines
+        unaccounted_mines = self.remaining_mines - accounted_mines
+        # Those unaccounted mines can now for a new  group
+        unaccounted_group = MineGroup(unaccounted_cells, unaccounted_mines)
+
+        # Extract safes and  mines from that group
+        safe, mines = [], []
+        if unaccounted_group.is_all_safe():
+            safe.extend(list(unaccounted_group.cells))
+        if unaccounted_group.is_all_mines():
+            mines.extend(list(unaccounted_group.cells))
+        return list(set(safe)), list(set(mines))
+
     def solve(self, field):
         ''' Main solving function.
         Go through various solving methods and return safe and mines lists
@@ -779,47 +834,32 @@ class MinesweeperSolver:
         # Store field as an instance variable
         self.field = field
 
-        # 0. First click on the "all 0" corner
+        # First click on the "all 0" corner
         if self.helper.are_all_covered(self.field):
             self.last_move_info = ("First click", None)
             return [tuple(0 for _ in range(len(self.shape))), ], None
 
+        # Several calculation needed for the following solution methods
         # Generate groups (main data for basic solving methods)
         self.generate_groups()
-
-        # 1. Naive Method
-        #################
-        safe, mines = self.method_naive()
-        if safe or mines:
-            self.last_move_info = ("Naive", None)
-            return safe, mines
-
-        # 2. Groups Method
-        ##################
-        safe, mines = self.method_groups()
-        if safe or mines:
-            self.last_move_info = ("Groups", None)
-            return safe, mines
-
-        # 3. Sub groups Method
-        ######################
-        safe, mines = self.method_subgroups()
-        if safe or mines:
-            self.last_move_info = ("Subgroups", None)
-            return safe, mines
-
-        # For further methods we need to know how the number of remaining mines
+        # Number of remaining mines
         self.calculate_remaining_mines()
-        # Ald have a list of all covered cells
+        # And a list of all covered cells
         self.generate_all_covered()
 
-        # 4. CSP method
-        # (stands for Constraint Satisfaction Problem)
-        ######################
-        safe, mines = self.method_csp()
-        if safe or mines:
-            self.last_move_info = ("CSP", None)
-            return safe, mines
+        # Try 4 deterministic methods
+        # If any yielded result - return it
+        for method, method_name in (
+                (self.method_naive, "Naive"),
+                (self.method_groups, "Groups"),
+                (self.method_subgroups, "Subgroups"),
+                (self.method_csp, "CSP"),
+                (self.method_coverage, "Coverage"),
+                ):
+            safe, mines = method()
+            if safe or mines:
+                self.last_move_info = (method_name, None)
+                return safe, mines
 
         # Calculate mine probability using various methods
         self.calculate_probabilities()
