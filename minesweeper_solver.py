@@ -378,13 +378,13 @@ class CellCluster:
     def calculate_solution_weights(self, covered_cells, remaining_mines):
         ''' Calculate how probable each solution  is,
         if there are total_mines left in the field. That is,
-        how many combinateions of mines are possible with this solution.
+        how many combinations of mines are possible with this solution.
         Populate self.solution_weights with the results
         '''
         self.solution_weights = []
 
-        # For each solution we calculte how  many combination are possible
-        # with the remianing mines on the remaining cells
+        # For each solution we calculate how  many combination are possible
+        # with the remaining mines on the remaining cells
         for solution in self.solutions:
             solution_mines = sum(1 for mine in solution if mine)
             solution_comb = math.comb(len(covered_cells) - len(solution),
@@ -402,12 +402,45 @@ class MineProbability:
     '''
 
     def __init__(self):
-        # Probablity of mines in this cell
+        # Probability of mines in this cell
         self.value = {}
         # Which method generated  this probability
         self.source = {}
         # Probability of getting a 0 in this cell
         self.opening_chance = {}
+
+    def pick_lowest_probability(self):
+        ''' Pick and return the cell(s) with the lowest mine probability,
+        from the self.mine_probabilities.
+        Also, return lowest probability predicted for this cell.
+        '''
+        lowest_probability = None
+        highest_opening_chance = None
+        least_likely_cells = []
+
+        # Go through the probability dict
+        for cell, probability in self.value.items():
+
+            opening_chance = self.opening_chance[cell]
+
+            # Re-start the list if:
+            # - The list is empty
+            # - We found lower mine probability
+            # - Mine probability is the same, but opening probability is higher
+            if lowest_probability is None or \
+               probability < lowest_probability or \
+               probability == lowest_probability and \
+               opening_chance > highest_opening_chance:
+                least_likely_cells = [cell, ]
+                lowest_probability = probability
+                highest_opening_chance = opening_chance
+
+            # Or if it is the same probability - add to the list
+            elif probability == lowest_probability and \
+                 highest_opening_chance == opening_chance:
+                least_likely_cells.append(cell)
+
+        return least_likely_cells, lowest_probability
 
 class MinesweeperSolver:
     ''' Methods related to solving minesweeper game. '''
@@ -546,8 +579,8 @@ class MinesweeperSolver:
 
     def calculate_unaccounted(self):
         ''' Calculate the cells and mines of "unknown" area, that is covered
-        area minuswhat we know from groups. Used in method "Covergae" and
-        allowes for better background probability calculations.
+        area minus what we know from groups. Used in method "Coverage" and
+        allows for better background probability calculations.
         '''
         # Reset
         self.unaccounted_group = None
@@ -560,7 +593,7 @@ class MinesweeperSolver:
             # The idea is to find a group that has a largest number of
             # unaccounted cells
             best_count = None
-            bestgroup = None
+            best_group = None
             for group in self.groups:
 
                 # We only need "exactly" groups
@@ -575,14 +608,14 @@ class MinesweeperSolver:
                 # Find the biggest group that we haven't touched yet
                 if best_count is None or len(group.cells) > best_count:
                     best_count = len(group.cells)
-                    bestgroup = group
+                    best_group = group
 
             # We have a matching group
-            if bestgroup is not None:
-                # Cells froom that group from now on are accounted for
-                accounted_cells = accounted_cells.union(bestgroup.cells)
+            if best_group is not None:
+                # Cells from that group from now on are accounted for
+                accounted_cells = accounted_cells.union(best_group.cells)
                 # And so are  mines
-                accounted_mines += bestgroup.mines
+                accounted_mines += best_group.mines
             # No such  group was found: coverage is done
             else:
                 break
@@ -591,12 +624,6 @@ class MinesweeperSolver:
         unaccounted_cells = set(self.covered_cells).difference(accounted_cells)
         # Same with mines
         unaccounted_mines = self.remaining_mines - accounted_mines
-
-        # Only use "perfect" coverage, meaning there should be no groups that
-        # overlap with unaccounted group
-        # for group in self.groups:
-        #     if unaccounted_cells.difference(group.cells):
-        #         return
 
         # Those unaccounted mines can now for a new  group
         self.unaccounted_group = MineGroup(unaccounted_cells, unaccounted_mines)
@@ -792,12 +819,19 @@ class MinesweeperSolver:
             if self.unaccounted_group is None or \
                len(self.unaccounted_group.cells) == 0:
                 return
+
+            # Only use "perfect" coverage, meaning there should be no groups that
+            # overlap with unaccounted group
+            for group in self.groups:
+                if self.unaccounted_group.cells.difference(group.cells):
+                    return
+
             unaccounted_probability = \
                 self.unaccounted_group.mines / len(self.unaccounted_group.cells)
             for cell in self.unaccounted_group.cells:
                 self.probability.value[cell] = unaccounted_probability
                 self.probability.source[cell] = "Unaccounted"
-                
+
         def probabilities_for_groups(self):
             ''' Populate self.mine_probabilities, based on groups data
             Each cell's probability is: max(group_mines / group_cells, ...),
@@ -829,38 +863,37 @@ class MinesweeperSolver:
                     self.probability.value[cell] = frequency
                     self.probability.source[cell] = "CSP"
 
-        # Reset probabillities
+        # Reset probabilities
         self.probability = MineProbability()
         # Background probability: all remaining mines on all covered cells
         background_probabilities(self)
         # Unaccounted (uncovered and not in groups) probability
-        #unaccounted_probabilities(self)
+        unaccounted_probabilities(self)
         # Based on mines in groups
         probabilities_for_groups(self)
         # Based on CSP solutions
         csp_probabilities(self)
 
-    def pick_lowest_probability(self):
-        ''' Pick and return the cell(s) with the lowest mine probability,
-        from the self.mine_probabilities.
-        Also, return lowest probability predicted for this cell.
+    def calculate_opening_chances(self):
+        ''' Populate opening_chance in self.probabilities by looking
+        at neighbors' chances
         '''
-        lowest_probability = None
-        least_likely_cells = []
-
-        # Go through the probability dict
-        for cell, probability in self.probability.value.items():
-
-            # If found a new best probability: re-start the best list
-            if lowest_probability is None or probability < lowest_probability:
-                least_likely_cells = [cell, ]
-                lowest_probability = probability
-
-            # Or if it is the same probability - add to the list
-            elif probability == lowest_probability:
-                least_likely_cells.append(cell)
-
-        return least_likely_cells, lowest_probability
+        # Go through all cells we have probability info for
+        # (that would be all covered cells)
+        for cell in self.probability.value:
+            opening_chance = 1
+            # Look at neighbors of each cell
+            for neighbor in self.helper.cell_surroundings(cell):
+                # If there are any mines around, there is no chance of opening
+                if self.field[neighbor] == ms.CELL_MINE:
+                    self.probability.opening_chance[cell] = 0
+                    break
+                # Otherwise each mine chance decrease opening chance
+                # by (1 - mine chance) times
+                if neighbor in self.probability.value:
+                    opening_chance *= (1 - self.probability.value[neighbor])
+            else:
+                self.probability.opening_chance[cell] = opening_chance
 
     def method_coverage(self):
         '''Extract safes and  mines from the unaccounted group
@@ -891,7 +924,8 @@ class MinesweeperSolver:
         # First click on the "all 0" corner
         if self.helper.are_all_covered(self.field):
             self.last_move_info = ("First click", None, None)
-            return [tuple(0 for _ in range(len(self.shape))), ], None
+            all_zeros = tuple(0 for _ in range(len(self.shape)))
+            return [all_zeros, ], None
 
         # Several calculation needed for the following solution methods
         # Generate groups (main data for basic solving methods)
@@ -919,8 +953,11 @@ class MinesweeperSolver:
 
         # Calculate mine probability using various methods
         self.calculate_probabilities()
+        # Calculate opening chances
+        self.calculate_opening_chances()
+
         # Pick a cell that is least likely a mine
-        lucky_cells, chance = self.pick_lowest_probability()
+        lucky_cells, chance = self.probability.pick_lowest_probability()
         #print(lucky_cells)
         if lucky_cells:
             lucky_cell = self.pick_a_random_cell(lucky_cells)
@@ -942,7 +979,7 @@ def main():
     settings = ms.GAME_TEST
     settings = ms.GAME_BEGINNER
 
-    game = ms.MinesweeperGame(settings, seed=0.4449890262755162)
+    game = ms.MinesweeperGame(settings, seed=0)
     solver = MinesweeperSolver(settings)
 
     while game.status == ms.STATUS_ALIVE:
