@@ -257,7 +257,7 @@ class CellCluster:
         # - Groups with too many possible mine positions (> 1001)
         # Do not solve such clusters
         if len(self.cells_set) / len(self.groups) > 12 or \
-           len(self.cells_set) > 40 or \
+           len(self.cells_set) > 50 or \
            max(math.comb(len(group.cells), group.mines)
                 for group in self.groups) > 1001:
             return
@@ -440,7 +440,7 @@ class MineProbability:
                  highest_opening_chance == opening_chance:
                 least_likely_cells.append(cell)
 
-        return least_likely_cells, lowest_probability
+        return least_likely_cells
 
 class MinesweeperSolver:
     ''' Methods related to solving minesweeper game. '''
@@ -957,13 +957,13 @@ class MinesweeperSolver:
         self.calculate_opening_chances()
 
         # Pick a cell that is least likely a mine
-        lucky_cells, chance = self.probability.pick_lowest_probability()
-        #print(lucky_cells)
+        lucky_cells = self.probability.pick_lowest_probability()
+
         if lucky_cells:
             lucky_cell = self.pick_a_random_cell(lucky_cells)
             self.last_move_info = ("Random",
                                    self.probability.source[lucky_cell],
-                                   chance)
+                                   self.probability.value[lucky_cell])
             return [lucky_cell, ], None
 
         # Until the count method implemented, there is a chance of

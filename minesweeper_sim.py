@@ -34,7 +34,7 @@ class MinesweeperSim:
         # calls in the solver would not affect it).
         self.game_seeds = [random.random() for _ in range(self.runs)]
 
-        # Placeholder for timimg
+        # Placeholder for timing
         self.spent_time = None
 
     def one_game(self, verbose=False):
@@ -65,7 +65,7 @@ class MinesweeperSim:
         '''
         # Choose if we need to display a progress bar
         if USE_PROGRESS_BAR:
-            iterator = tqdm(range(self.runs))
+            iterator = tqdm(range(self.runs), leave=False)
         else:
             iterator = range(self.runs)
 
