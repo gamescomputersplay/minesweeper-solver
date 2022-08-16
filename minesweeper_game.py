@@ -161,8 +161,8 @@ class MinesweeperHelper:
                 continue
 
             # If resulting coords are valid
-            cell_with_offset = tuple([cell[i] + offset[i]
-                                      for i in range(len(self.shape))])
+            cell_with_offset = tuple(cell[i] + offset[i]
+                                      for i in range(len(self.shape)))
             if self.valid_coords(cell_with_offset):
                 surroundings.append(cell_with_offset)
 
@@ -501,10 +501,12 @@ class MinesweeperGame:
 
         # Horizontal rule numbering each 2D field
         if show_ruler:
+
             # Pad it, so the number is in the middle of a field
             field_with = len(buffer[0][0])
             padding_left = " " * ((field_with - 2) // 2 + 2)
             padding_right = " " * (field_with - len(padding_left) - 1)
+
             for field_n, _ in enumerate(buffer):
                 output += padding_left + str(field_n) + padding_right
             output += "\n"
@@ -526,17 +528,26 @@ class MinesweeperGame:
         fourth = field_to_show.shape[0]
         output = ""
         for i in range(fourth):
-            show_ruler = True if i == 0 else False
+
+            # Show ruler only for the first row
+            show_ruler = i == 0
+
+            # Get the 3D representation for the current row
             fields = self.field2str_3d(field_to_show[i],
                                        show_ruler=show_ruler)
+
+            # Go through the 3D line by line
             cur_line_of_fields = fields.split("\n")[:-1]
             for line_n, line in enumerate(cur_line_of_fields):
+
+                # Inserting either a row number or space
                 if line_n == len(cur_line_of_fields) // 2 + \
                    (1 if i == 0 else 0):
                     output += str(i)
                 else:
                     output += " "
                 output += line + "\n"
+
         return output
 
     def field2str(self, field_to_show, show_ruler=True):

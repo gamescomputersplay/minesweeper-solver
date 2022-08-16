@@ -436,11 +436,12 @@ class MineProbability:
                 highest_opening_chance = opening_chance
 
             # Or if it is the same probability - add to the list
-            elif probability == lowest_probability and \
-                 highest_opening_chance == opening_chance:
+            elif (probability == lowest_probability and
+                  highest_opening_chance == opening_chance):
                 least_likely_cells.append(cell)
 
         return least_likely_cells
+
 
 class MinesweeperSolver:
     ''' Methods related to solving minesweeper game. '''
@@ -480,11 +481,10 @@ class MinesweeperSolver:
         # {cell: probability_of_it_being_a_mine}
         self.probability = MineProbability()
 
-
         # Unaccounted group (all covered minus those  we know the number
         # of mines for). Used to solve exclaves (like 8) and some probability
         # calculations
-        self.unaccounted_group  = None
+        self.unaccounted_group = None
 
         # Info about last move. Normally it would be a tuple
         # ("method name", probability). Probability make sense if it
@@ -626,7 +626,8 @@ class MinesweeperSolver:
         unaccounted_mines = self.remaining_mines - accounted_mines
 
         # Those unaccounted mines can now for a new  group
-        self.unaccounted_group = MineGroup(unaccounted_cells, unaccounted_mines)
+        self.unaccounted_group = MineGroup(unaccounted_cells,
+                                           unaccounted_mines)
 
     def method_naive(self):
         ''' Method #1. Naive
@@ -820,14 +821,15 @@ class MinesweeperSolver:
                len(self.unaccounted_group.cells) == 0:
                 return
 
-            # Only use "perfect" coverage, meaning there should be no groups that
-            # overlap with unaccounted group
+            # Only use "perfect" coverage, meaning there should be no groups
+            # that overlap with unaccounted group
             for group in self.groups:
                 if self.unaccounted_group.cells.difference(group.cells):
                     return
 
             unaccounted_probability = \
-                self.unaccounted_group.mines / len(self.unaccounted_group.cells)
+                self.unaccounted_group.mines / \
+                len(self.unaccounted_group.cells)
             for cell in self.unaccounted_group.cells:
                 self.probability.value[cell] = unaccounted_probability
                 self.probability.source[cell] = "Unaccounted"
@@ -846,11 +848,9 @@ class MinesweeperSolver:
                 group_probability = group.mines / len(group.cells)
                 for cell in group.cells:
                     # Overwrite the probability result
-                    #self.mine_probabilities[cell] = group_probability
                     # I'm not sure why, but "min" works best here
                     self.probability.value[cell] = \
                          min(group_probability, self.probability.value[cell])
-                    #self.probability.value[cell] = group_probability
                     self.probability.source[cell] = "Groups"
 
         def csp_probabilities(self):

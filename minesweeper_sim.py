@@ -14,6 +14,60 @@ import minesweeper_solver as ms_solver
 # May have issues on some IDEs
 USE_PROGRESS_BAR = True
 
+class SolverStat:
+    ''' Class to collect and display statistics about methods, used by solver
+    '''
+
+    def __init__(self):
+        # main repository for the data. Will be a dict like
+        # {"Naive": 100, "Group":200}
+        self.data = {}
+        self.games = 0
+        self.wins = 0
+
+    def add_move(self, last_move_info, safe, mines):
+        ''' Add move information
+        '''
+        method, _, _ = last_move_info
+
+        # Count clicks as the sum of safe and mines
+        count = 0
+        for clicks in (safe, mines):
+            if clicks:
+                count += len(clicks)
+
+        self.data[method] = self.data.get(method, 0) + count
+
+    def add_game(self, result):
+        ''' Add game information
+        '''
+        self.games += 1
+        if result == ms.STATUS_WON:
+            self.wins += 1
+
+    def win_rate(self):
+        ''' Return current win_rate
+        '''
+        if self.games:
+            return self.wins / self.games
+        return 0
+
+    def margin_of_error(self):
+        ''' Current margin of error (95% confidence).
+        In percentage points (+- that many %).
+        '''
+        win_rate = self.win_rate()
+        z_parameter = 1.95  # Corresponds to 95% confidence
+        return z_parameter * math.sqrt(win_rate * (1 - win_rate) / self.games)
+
+    def __str__(self):
+        ''' Display the stats
+        '''
+        win_rate = self.win_rate()
+        output = ""
+        output += f"Win rate: {win_rate:.1%}±{self.margin_of_error():.1%}\n"
+        return output
+
 
 class MinesweeperSim:
     ''' Methods to handle minesweeper game simulation
@@ -22,9 +76,6 @@ class MinesweeperSim:
     def __init__(self, runs, settings, seed=None):
         self.runs = runs
         self.settings = settings
-
-        # List to store the results
-        self.results = []
 
         # Use seed, if seed passed
         if seed is not None:
@@ -37,9 +88,12 @@ class MinesweeperSim:
         # Placeholder for timing
         self.spent_time = None
 
+        # statistics collector object
+        self.solver_stat = SolverStat()
+
     def one_game(self, verbose=False):
         ''' Playing one game.
-        Verbose would show board for every move
+        Verbose would print out the board for every move
         '''
 
         # Start the game, using one of the seeds
@@ -52,9 +106,15 @@ class MinesweeperSim:
             if verbose:
                 print(f"Player: safe={safe}, mines={mines}")
             game.make_a_move(safe, mines)
+
+            # Send all the data into the statistics object
+            self.solver_stat.add_move(solver.last_move_info, safe, mines)
+
             if verbose:
                 print(game)
 
+        # Game over
+        self.solver_stat.add_game(game.status)
         if verbose:
             print(f"Result: {ms.STATUS_MESSAGES[game.status]}")
 
@@ -72,40 +132,21 @@ class MinesweeperSim:
         # Run the simulation (with timing)
         start_time = time.time()
         for _ in iterator:
-            self.results.append(self.one_game())
+            self.one_game()
         self.spent_time = time.time() - start_time
-        return self.win_rate()
 
-    def win_rate(self):
-        ''' Return current win_rate
-        '''
-        return self.results.count(ms.STATUS_WON) / len(self.results)
+        # Return the overall win rate
+        return self.solver_stat.win_rate()
 
-    def margin_of_error(self):
-        ''' Current margin of error (95% confidence).
-        In percentage points (+- that many %).
-        '''
-        runs = len(self.results)
-        win_rate = self.win_rate()
-        z_parameter = 1.95  # Corresponds to 95% confidence
-        return z_parameter * math.sqrt(win_rate * (1 - win_rate) / runs)
-
-    def display_stats(self):
+    def print_stats(self):
         ''' Print out the stats of teh simulation
         '''
+        timing_info = f"Simulation complete in: {self.spent_time:.0f}s, "
+        timing_info += f"Time per game: {self.spent_time / self.runs:.2f}s, "
+        timing_info += f"Games per sec: {self.runs / self.spent_time:.2f}s"
 
-        if not self.results:
-            return "No data to display"
-
-        output = ""
-
-        win_rate = self.win_rate()
-        output += f"Win rate: {win_rate:.1%}±{self.margin_of_error():.1%}\n"
-        output += f"Total time: {self.spent_time:.0f}s, "
-        output += f"Time per game: {self.spent_time / self.runs:.2f}s, "
-        output += f"Games per sec: {self.runs / self.spent_time:.2f}s\n"
-
-        return output
+        print(timing_info)
+        print(self.solver_stat)
 
     def __str__(self):
         ''' Show parameters of teh simulation
@@ -126,18 +167,22 @@ def main():
     # games to simulate
     runs = 100
 
+    # All popular minesweeper and multidimensional minesweeper presets
     presets = (ms.GAME_BEGINNER, ms.GAME_INTERMEDIATE, ms.GAME_EXPERT,
                ms.GAME_3D_EASY, ms.GAME_3D_MEDIUM, ms.GAME_3D_HARD,
                ms.GAME_4D_EASY, ms.GAME_4D_MEDIUM, ms.GAME_4D_HARD,
                ms.GAME_4D_HARDER)
-    # only_2d = (ms.GAME_BEGINNER, ms.GAME_INTERMEDIATE, ms.GAME_EXPERT)
+    # Only 2D (traditional) minesweeper presets
+    presets = (ms.GAME_BEGINNER, ms.GAME_INTERMEDIATE, ms.GAME_EXPERT)
+    # Only a small, beginner 2D board (for testing)
+    presets = (ms.GAME_BEGINNER, )
 
     for settings in presets:
 
         simulation = MinesweeperSim(runs, settings, seed)
         print(simulation)
         simulation.run()
-        print(simulation.display_stats())
+        simulation.print_stats()
 
 
 if __name__ == "__main__":
