@@ -5,7 +5,10 @@ The game is from minesweeper_game, the solver is from minesweeper_solver
 import time
 import math
 import random
+# progress bar
 from tqdm import tqdm
+# text table
+from texttable import Texttable
 
 import minesweeper_game as ms
 import minesweeper_solver as ms_solver
@@ -13,6 +16,8 @@ import minesweeper_solver as ms_solver
 # Whether to display progress bar for a simulation
 # May have issues on some IDEs
 USE_PROGRESS_BAR = True
+SHOW_METHODS_STAT = True
+
 
 class SolverStat:
     ''' Class to collect and display statistics about methods, used by solver
@@ -60,11 +65,34 @@ class SolverStat:
         z_parameter = 1.95  # Corresponds to 95% confidence
         return z_parameter * math.sqrt(win_rate * (1 - win_rate) / self.games)
 
+    def table_by_method(self):
+        '''Generate a text table with information about method being used
+        '''
+        # Sum of all clicked cells
+        total_cells = sum(self.data.values())
+        # Table to display
+        table_data = [["Method", "Total", "Per game", "%"]]
+        for method, count in self.data.items():
+            table_data.append([method,
+                               count,
+                               count / self.games,
+                               count * 100 / total_cells])
+
+        # Generate table with texttable module
+        table = Texttable()
+        table.set_deco(Texttable.HEADER)
+        table.set_cols_dtype(['t', 'i', 'f', 'f'])
+        table.set_cols_align(["l", "r", "r", "r"])
+        table.add_rows(table_data)
+        return table.draw() + "\n\n"
+
     def __str__(self):
         ''' Display the stats
         '''
         win_rate = self.win_rate()
         output = ""
+        if SHOW_METHODS_STAT:
+            output += self.table_by_method()
         output += f"Win rate: {win_rate:.1%}±{self.margin_of_error():.1%}\n"
         return output
 
@@ -145,7 +173,7 @@ class MinesweeperSim:
         timing_info += f"Time per game: {self.spent_time / self.runs:.2f}s, "
         timing_info += f"Games per sec: {self.runs / self.spent_time:.2f}s"
 
-        print(timing_info)
+        print(timing_info, "\n")
         print(self.solver_stat)
 
     def __str__(self):
