@@ -961,7 +961,7 @@ class MinesweeperSolver:
 
         if lucky_cells:
             lucky_cell = self.pick_a_random_cell(lucky_cells)
-            self.last_move_info = ("Random",
+            self.last_move_info = ("Probability",
                                    self.probability.source[lucky_cell],
                                    self.probability.value[lucky_cell])
             return [lucky_cell, ], None

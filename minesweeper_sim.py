@@ -17,6 +17,7 @@ import minesweeper_solver as ms_solver
 # May have issues on some IDEs
 USE_PROGRESS_BAR = True
 SHOW_METHODS_STAT = True
+SHOW_PROBABILITY_STAT = True
 
 
 class SolverStat:
@@ -27,13 +28,24 @@ class SolverStat:
         # main repository for the data. Will be a dict like
         # {"Naive": 100, "Group":200}
         self.data = {}
+        # Games counter
         self.games = 0
+        # Wins counter
         self.wins = 0
+
+        # Data about probability. Dict like:
+        # {"Probability_method": [0.5, 0.1, -0.2]}
+        # Where negative number means it resulted in death
+        self.probability_data = {}
+
+        # Last probability method that was used (it will be blamed
+        # if the game is lost)
+        self.last_probability_method = None
 
     def add_move(self, last_move_info, safe, mines):
         ''' Add move information
         '''
-        method, _, _ = last_move_info
+        method, prob_method, chance = last_move_info
 
         # Count clicks as the sum of safe and mines
         count = 0
@@ -41,7 +53,20 @@ class SolverStat:
             if clicks:
                 count += len(clicks)
 
+        # Add the data about the method that was used
         self.data[method] = self.data.get(method, 0) + count
+
+        # Add the data about the probability method that was used
+        if method == "Probability":
+            # Create a list to hold info about this method
+            if prob_method not in self.probability_data:
+                self.probability_data[prob_method] = []
+
+            # Add the latest chance
+            self.probability_data[prob_method].append(chance)
+            # Remember which was the last probability method we used
+            # (we will blame it wor the lost)
+            self.last_probability_method = prob_method
 
     def add_game(self, result):
         ''' Add game information
@@ -49,6 +74,12 @@ class SolverStat:
         self.games += 1
         if result == ms.STATUS_WON:
             self.wins += 1
+        # If we lost
+        elif result == ms.STATUS_DEAD:
+            # Than blame the latest probability method
+            # Mark it by inverting the chance value
+            self.probability_data[self.last_probability_method][-1] = \
+                -self.probability_data[self.last_probability_method][-1]
 
     def win_rate(self):
         ''' Return current win_rate
@@ -84,7 +115,91 @@ class SolverStat:
         table.set_cols_dtype(['t', 'i', 'f', 'f'])
         table.set_cols_align(["l", "r", "r", "r"])
         table.add_rows(table_data)
-        return table.draw() + "\n\n"
+        return "Clicks by solving method:\n" + table.draw() + "\n\n"
+
+    def table_by_probability_method(self):
+        ''' Generate a table with results of various random methods.
+        Stats are presented by "buckets", in two ways: exactly the value
+        and a range between values.
+        '''
+
+        def fill_the_bucket(exactly=None, low=None, high=None):
+            '''Return the stats for particular "Bucket". Bucket can be
+            exactly that probability or a range of probability
+            Return the dict: {"Prob method": (actual probability, count)}
+            '''
+            bucket = []
+
+            # Counter for overall result
+            total_guesses = 0
+            total_loses = 0
+
+            # We go through all the probability data by method
+            for _, method_data in self.probability_data.items():
+
+                # We'll count how many guesses there were
+                # Adn how many resulted in death
+                methods_guesses = 0
+                methods_loses = 0
+
+                for probability in method_data:
+                    # Check if the probability falls into the bucket,
+                    # be it "exactly" or a range
+                    if exactly is not None and abs(probability) == exactly or \
+                       low is not None and low < abs(probability) < high:
+                        methods_guesses += 1
+                        total_guesses += 1
+                        if probability < 0:
+                            methods_loses += 1
+                            total_loses += 1
+
+                # Store the result in the final dict
+                if 0 < methods_guesses > threshold:
+                    bucket.append(f"{methods_loses / methods_guesses:.3f} " +
+                                  f"({methods_guesses})")
+                else:
+                    bucket.append("")
+
+            # Store the total result in the final dict
+            if 0 < total_guesses > threshold:
+                bucket.append(f"{total_loses / total_guesses:.3f} " +
+                                f"({total_guesses})")
+            else:
+                bucket.append("")
+
+            return bucket
+
+        # Sizeof a bucket to group results in
+        buckets_edges = [0, .1, .25, 1/3, .5, 1]
+        # Only display data that has at least this many data points
+        threshold = 10
+
+        table_data = [["Predicted"] + list(self.probability_data) + ["Total"]]
+
+        # This funky loop and the conditions below allows us to generate
+        # 2 type of buckets: exactly that value and range between two values
+        for i in range(1, (len(buckets_edges) - 1) * 2):
+
+            if i % 2 == 0:
+                # The exactly bucket
+                exactly = buckets_edges[i // 2]
+                bucket = [f" {exactly:.2f}"] + \
+                    fill_the_bucket(exactly=exactly)
+            else:
+                # The "range" bucket
+                low = buckets_edges[(i - 1) // 2]
+                high = buckets_edges[(i + 1) // 2]
+                bucket = [f"{low:.2f}-{high:.2f}"] + \
+                    fill_the_bucket(low=low, high=high)
+
+            table_data.append(bucket)
+
+        # Generate table with texttable module
+        table = Texttable()
+        table.set_deco(Texttable.HEADER)
+        table.set_cols_align(["r"] + ["l"] * (len(table_data[0]) - 1))
+        table.add_rows(table_data)
+        return "Probability accuracy:\n" + table.draw() + "\n\n"
 
     def __str__(self):
         ''' Display the stats
@@ -93,6 +208,8 @@ class SolverStat:
         output = ""
         if SHOW_METHODS_STAT:
             output += self.table_by_method()
+        if SHOW_PROBABILITY_STAT:
+            output += self.table_by_probability_method()
         output += f"Win rate: {win_rate:.1%}±{self.margin_of_error():.1%}\n"
         return output
 
@@ -142,7 +259,15 @@ class MinesweeperSim:
                 print(game)
 
         # Game over
+        # Add game results to teh statistics
         self.solver_stat.add_game(game.status)
+
+        # Notify if deterministic method resulted in death
+        # This should not happen though
+        if game.status == ms.STATUS_DEAD and \
+           solver.last_move_info[0] != "Probability":
+            print(f"Warning: death by method '{solver.last_move_info[0]}'")
+
         if verbose:
             print(f"Result: {ms.STATUS_MESSAGES[game.status]}")
 
