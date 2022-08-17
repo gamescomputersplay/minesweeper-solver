@@ -847,11 +847,11 @@ class MinesweeperSolver:
                 # Probability of each mine in teh group
                 group_probability = group.mines / len(group.cells)
                 for cell in group.cells:
+                    # If group's probability is higher than the background:
                     # Overwrite the probability result
-                    # I'm not sure why, but "min" works best here
-                    self.probability.value[cell] = \
-                         min(group_probability, self.probability.value[cell])
-                    self.probability.source[cell] = "Groups"
+                    if group_probability > self.probability.value[cell]:
+                        self.probability.value[cell] = group_probability
+                        self.probability.source[cell] = "Groups"
 
         def csp_probabilities(self):
             ''' Calculate mine possibilities based on CSP

@@ -123,6 +123,16 @@ class SolverStat:
         and a range between values.
         '''
 
+        def display_probability(guesses, loses):
+            '''The string to write to the probability table.
+            Also, some sanitization.
+            '''
+            guesses_str = f"{guesses}" if guesses < 1000 \
+                          else f"{guesses//1000}k"
+            if 0 < guesses > threshold:
+                return f"{loses / guesses:.3f} ({guesses_str})"
+            return ""
+
         def fill_the_bucket(exactly=None, low=None, high=None):
             '''Return the stats for particular "Bucket". Bucket can be
             exactly that probability or a range of probability
@@ -154,18 +164,12 @@ class SolverStat:
                             total_loses += 1
 
                 # Store the result in the final dict
-                if 0 < methods_guesses > threshold:
-                    bucket.append(f"{methods_loses / methods_guesses:.3f} " +
-                                  f"({methods_guesses})")
-                else:
-                    bucket.append("")
+                bucket.append(display_probability(methods_guesses,
+                                                  methods_loses))
 
             # Store the total result in the final dict
-            if 0 < total_guesses > threshold:
-                bucket.append(f"{total_loses / total_guesses:.3f} " +
-                                f"({total_guesses})")
-            else:
-                bucket.append("")
+            bucket.append(display_probability(total_guesses,
+                                              total_loses))
 
             return bucket
 
