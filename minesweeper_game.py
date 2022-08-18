@@ -162,7 +162,7 @@ class MinesweeperHelper:
 
             # If resulting coords are valid
             cell_with_offset = tuple(cell[i] + offset[i]
-                                      for i in range(len(self.shape)))
+                                     for i in range(len(self.shape)))
             if self.valid_coords(cell_with_offset):
                 surroundings.append(cell_with_offset)
 
