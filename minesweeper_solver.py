@@ -403,12 +403,6 @@ class CellCluster:
         '''Based on solution and weights, calculate, how many mines we expect
         this cluster to have, on average.
         '''
-        # Special case: cluster is made up of 1 group
-        # Than the number of mines in this group  is the answer
-        if len(self.groups) == 1:
-            self.probable_mines = self.groups[0].mines
-            return
-
         # Solved cluster
         solutions_mines = 0
         solutions_count = 0
@@ -416,7 +410,7 @@ class CellCluster:
         for solution_n, solution in enumerate(self.solutions):
             # Number of mines would be equal to True's in solution
             # And weight shows how many times this solution can be repeated
-            solutions_mines += sum(1 for position in solution if position) * \
+            solutions_mines += solution.count(True) * \
                 self.solution_weights[solution_n]
             solutions_count += self.solution_weights[solution_n]
 
@@ -426,7 +420,8 @@ class CellCluster:
             self.probable_mines = solutions_mines / solutions_count
             return
 
-        # If cluster wasn't solved:
+        # If cluster wasn't solved (which is besically never happens on 2D field,
+        # but can happen at higher dimensions):
         cells_mine_probabilities = {}
         for group in self.groups:
 
@@ -529,7 +524,8 @@ class MinesweeperSolver:
 
         # History of clusters we already processed, so we won't have to
         # solved them again (they can be quite time consuming)
-        self.clusters_history = set()
+        # Also used to cache mine counts, {hash_value: mine_count}
+        self.clusters_history = {}
 
         # Placeholder for mine probability data
         # {cell: probability_of_it_being_a_mine}
@@ -820,21 +816,27 @@ class MinesweeperSolver:
         for cluster in self.clusters:
 
             # Cluster deduplication. If we solved this cluster already, ignore
+            # But get the probabemines value - we'll use it in probabilit method
             if cluster.calculate_hash() in self.clusters_history:
+                cluster.probable_mines = \
+                    self.clusters_history[cluster.calculate_hash()]
                 continue
 
-            # Solve the cluster
+            # Solve the cluster, inclusing weights,
+            # frequencies and probable mines
             cluster.solve_cluster(self.remaining_mines)
             cluster.calculate_solution_weights(self.covered_cells,
                                                self.remaining_mines)
             cluster.calculate_frequencies()
+            cluster.calculate_probable_mines()
 
             # Get safe cells and mines from cluster
             safe.extend(cluster.safe_cells())
             mines.extend(cluster.mine_cells())
 
             # Save cluster's hash in history for deduplication
-            self.clusters_history.add(cluster.calculate_hash())
+            self.clusters_history[cluster.calculate_hash()] = \
+                cluster.probable_mines
 
         return list(set(safe)), list(set(mines))
 
@@ -862,29 +864,6 @@ class MinesweeperSolver:
             for cell in self.covered_cells:
                 self.probability.value[cell] = background_probability
                 self.probability.source[cell] = "Background"
-
-        def unaccounted_probabilities(self):
-            ''' Background probability is all mines / all covered cells .
-            It is quite crude and often inaccurate, but sometimes it is better
-            to click deep into the unknown rather than try 50/50 guess.
-            '''
-            # It can be empty, and in that case we can't use it
-            if self.unaccounted_group is None or \
-               len(self.unaccounted_group.cells) == 0:
-                return
-
-            # Only use "perfect" coverage, meaning there should be no groups
-            # that overlap with unaccounted group
-            for group in self.groups:
-                if self.unaccounted_group.cells.difference(group.cells):
-                    return
-
-            unaccounted_probability = \
-                self.unaccounted_group.mines / \
-                len(self.unaccounted_group.cells)
-            for cell in self.unaccounted_group.cells:
-                self.probability.value[cell] = unaccounted_probability
-                self.probability.source[cell] = "Unaccounted"
 
         def probabilities_for_groups(self):
             ''' Populate self.mine_probabilities, based on groups data
@@ -920,18 +899,31 @@ class MinesweeperSolver:
             of mines outside of clusters. Basically, it is a more accurate
             version of background probabilities.
             '''
+            # Collect all cells and mine estimations from all clusters
+            accounted_cells = set()
+            accounted_mines = 0
             for cluster in self.clusters:
-                print(cluster)
-                cluster.calculate_probable_mines()
-                print(cluster.probable_mines)
+                accounted_cells = accounted_cells.union(cluster.cells_set)
+                accounted_mines += cluster.probable_mines
 
+            # Whatever is not in clusters is unaccounted for: cells and mines
+            unaccouted_cells = set(self.covered_cells).difference(accounted_cells)
+            unaccounted_mines = self.remaining_mines - accounted_mines
+
+            # If no unaccounted cells - can't do anything
+            if not unaccouted_cells:
+                return
+
+            # And this is the probability of a mine in those cells
+            unaccounted_mine_chance = unaccounted_mines / len(unaccouted_cells)
+            for cell in unaccouted_cells:
+                self.probability.value[cell] = unaccounted_mine_chance
+                self.probability.source[cell] = "Cluster_leftovers"
 
         # Reset probabilities
         self.probability = MineProbability()
         # Background probability: all remaining mines on all covered cells
         background_probabilities(self)
-        # Unaccounted (uncovered and not in groups) probability
-        unaccounted_probabilities(self)
         # Based on mines in groups
         probabilities_for_groups(self)
         # Based on CSP solutions
@@ -1044,7 +1036,7 @@ def main():
     settings = ms.GAME_TEST
     settings = ms.GAME_BEGINNER
 
-    game = ms.MinesweeperGame(settings, seed=0.660245378622389)
+    game = ms.MinesweeperGame(settings, seed=0.540283606970324)
     solver = MinesweeperSolver(settings)
 
     while game.status == ms.STATUS_ALIVE:
