@@ -420,8 +420,8 @@ class CellCluster:
             self.probable_mines = solutions_mines / solutions_count
             return
 
-        # If cluster wasn't solved (which is besically never happens on 2D field,
-        # but can happen at higher dimensions):
+        # If cluster wasn't solved (which is besically never happens
+        # on 2D field, but can happen at higher dimensions):
         cells_mine_probabilities = {}
         for group in self.groups:
 
@@ -550,12 +550,14 @@ class MinesweeperSolver:
                 all_covered.append(cell)
         self.covered_cells = all_covered
 
-    @staticmethod
-    def pick_a_random_cell(cells):
-        '''Pick a random cell out of the list of cells.
-        (Either for testing or when we are reduced to guessing)
+    def generate_remaining_mines(self):
+        ''' Based on mines we know about, calculate how many are still
+        on the filed. Populate self.remaining_mines
         '''
-        return random.choice(cells)
+        self.remaining_mines = self.total_mines
+        for cell in self.helper.iterate_over_all_cells():
+            if self.field[cell] == ms.CELL_MINE:
+                self.remaining_mines -= 1
 
     def generate_groups(self):
         '''Populate self.group with all found cell groups
@@ -625,7 +627,7 @@ class MinesweeperSolver:
                     # Exit the while loop
                     break
 
-    def calculate_unaccounted(self):
+    def generate_unaccounted(self):
         ''' Calculate the cells and mines of "unknown" area, that is covered
         area minus what we know from groups. Used in method "Coverage" and
         allows for better background probability calculations.
@@ -677,29 +679,10 @@ class MinesweeperSolver:
         self.unaccounted_group = MineGroup(unaccounted_cells,
                                            unaccounted_mines)
 
-    def method_naive(self):
-        ''' Method #1. Naive
-        Check if there are all safe or all mines groups.
-        Return safe and mines found in those groups
-        '''
-        safe, mines = [], []
-        for group in self.groups:
-
-            # No remaining mines
-            if group.is_all_safe():
-                safe.extend(list(group.cells))
-
-            # All covered are mines
-            if group.is_all_mines():
-                mines.extend(list(group.cells))
-
-        return list(set(safe)), list(set(mines))
-
     @staticmethod
     def deduce_safe(group_a, group_b):
         ''' Given two mine groups, deduce if there are any safe cells.
         '''
-
         # For that, we need two conditions:
         # 1. A is a subset of B (only checks this way, so external function
         # need to make sure this function called both ways).
@@ -719,7 +702,6 @@ class MinesweeperSolver:
         ''' Given two mine groups, deduce if there are any mines.
         Similar to deduce_safe, but the condition is different.
         '''
-
         if group_a.cells.issubset(group_b.cells):
 
             # 2. If difference in number of cells is the same as
@@ -731,6 +713,24 @@ class MinesweeperSolver:
                 return list(group_b.cells - group_a.cells)
 
         return []
+
+    def method_naive(self):
+        ''' Method #1. Naive
+        Check if there are all safe or all mines groups.
+        Return safe and mines found in those groups
+        '''
+        safe, mines = [], []
+        for group in self.groups:
+
+            # No remaining mines
+            if group.is_all_safe():
+                safe.extend(list(group.cells))
+
+            # All covered are mines
+            if group.is_all_mines():
+                mines.extend(list(group.cells))
+
+        return list(set(safe)), list(set(mines))
 
     def method_groups(self):
         ''' Method #2. Groups
@@ -816,7 +816,8 @@ class MinesweeperSolver:
         for cluster in self.clusters:
 
             # Cluster deduplication. If we solved this cluster already, ignore
-            # But get the probabemines value - we'll use it in probabilit method
+            # it, but get the probable mines  from the "cache" - we'll need it
+            # for probability method
             if cluster.calculate_hash() in self.clusters_history:
                 cluster.probable_mines = \
                     self.clusters_history[cluster.calculate_hash()]
@@ -840,14 +841,18 @@ class MinesweeperSolver:
 
         return list(set(safe)), list(set(mines))
 
-    def calculate_remaining_mines(self):
-        ''' Based on mines we know about, calculate how many are still
-        on the filed. Populate self.remaining_mines
+    def method_coverage(self):
+        '''Extract safes and  mines from the unaccounted group
         '''
-        self.remaining_mines = self.total_mines
-        for cell in self.helper.iterate_over_all_cells():
-            if self.field[cell] == ms.CELL_MINE:
-                self.remaining_mines -= 1
+        if self.unaccounted_group is None:
+            return [], []
+
+        safe, mines = [], []
+        if self.unaccounted_group.is_all_safe():
+            safe.extend(list(self.unaccounted_group.cells))
+        if self.unaccounted_group.is_all_mines():
+            mines.extend(list(self.unaccounted_group.cells))
+        return list(set(safe)), list(set(mines))
 
     def calculate_probabilities(self):
         ''' Calculate probabilities of mines (and populate
@@ -900,25 +905,26 @@ class MinesweeperSolver:
             version of background probabilities.
             '''
             # Collect all cells and mine estimations from all clusters
-            accounted_cells = set()
-            accounted_mines = 0
+            cells_in_clusters = set()
+            mines_in_clusters = 0
             for cluster in self.clusters:
-                accounted_cells = accounted_cells.union(cluster.cells_set)
-                accounted_mines += cluster.probable_mines
+                cells_in_clusters = cells_in_clusters.union(cluster.cells_set)
+                mines_in_clusters += cluster.probable_mines
 
             # Whatever is not in clusters is unaccounted for: cells and mines
-            unaccouted_cells = set(self.covered_cells).difference(accounted_cells)
-            unaccounted_mines = self.remaining_mines - accounted_mines
+            leftover_cells = set(self.covered_cells).\
+                difference(cells_in_clusters)
+            leftover_mines = self.remaining_mines - mines_in_clusters
 
             # If no unaccounted cells - can't do anything
-            if not unaccouted_cells:
+            if not leftover_cells:
                 return
 
             # And this is the probability of a mine in those cells
-            unaccounted_mine_chance = unaccounted_mines / len(unaccouted_cells)
-            for cell in unaccouted_cells:
-                self.probability.value[cell] = unaccounted_mine_chance
-                self.probability.source[cell] = "Cluster_leftovers"
+            leftover_mine_chance = leftover_mines / len(leftover_cells)
+            for cell in leftover_cells:
+                self.probability.value[cell] = leftover_mine_chance
+                self.probability.source[cell] = "CSP Leftovers"
 
         # Reset probabilities
         self.probability = MineProbability()
@@ -952,18 +958,12 @@ class MinesweeperSolver:
             else:
                 self.probability.opening_chance[cell] = opening_chance
 
-    def method_coverage(self):
-        '''Extract safes and  mines from the unaccounted group
+    @staticmethod
+    def pick_a_random_cell(cells):
+        '''Pick a random cell out of the list of cells.
+        (Either for testing or when we are reduced to guessing)
         '''
-        if self.unaccounted_group is None:
-            return [], []
-
-        safe, mines = [], []
-        if self.unaccounted_group.is_all_safe():
-            safe.extend(list(self.unaccounted_group.cells))
-        if self.unaccounted_group.is_all_mines():
-            mines.extend(list(self.unaccounted_group.cells))
-        return list(set(safe)), list(set(mines))
+        return random.choice(cells)
 
     def solve(self, field):
         ''' Main solving function.
@@ -985,14 +985,14 @@ class MinesweeperSolver:
             return [all_zeros, ], None
 
         # Several calculation needed for the following solution methods
+        # Alist of all covered cells
+        self.generate_all_covered()
+        # Number of remaining mines
+        self.generate_remaining_mines()
         # Generate groups (main data for basic solving methods)
         self.generate_groups()
-        # Number of remaining mines
-        self.calculate_remaining_mines()
-        # And a list of all covered cells
-        self.generate_all_covered()
-        # Unaccounted cells (covered - mines)
-        self.calculate_unaccounted()
+        # Unaccounted cells (covered minus mines, has  to go after the  groups)
+        self.generate_unaccounted()
 
         # Try 4 deterministic methods
         # If any yielded result - return it
