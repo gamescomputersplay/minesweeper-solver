@@ -4,6 +4,7 @@ minesweeper_game.py
 '''
 
 import random
+import math
 
 import minesweeper_game as ms
 import minesweeper_classes as mc
@@ -341,13 +342,13 @@ class MinesweeperSolver:
                     self.clusters_history[cluster.calculate_hash()]
                 continue
 
-            # Solve the cluster, inclusing weights,
+            # Solve the cluster, including weights,
             # frequencies and probable mines
             cluster.solve_cluster(self.remaining_mines)
             cluster.calculate_solution_weights(self.covered_cells,
                                                self.remaining_mines)
             cluster.calculate_frequencies()
-            cluster.calculate_probable_mines()
+            cluster.possible_mine_counts()
 
             # Get safe cells and mines from cluster
             safe.extend(cluster.safe_cells())
@@ -422,24 +423,65 @@ class MinesweeperSolver:
             of mines outside of clusters. Basically, it is a more accurate
             version of background probabilities.
             '''
+            # Rarely, there are no clusters (when covered area is walled off
+            # by mines, for example, like last 8)
+            if not self.clusters:
+                return
+
             # Collect all cells and mine estimations from all clusters
             cells_in_clusters = set()
-            mines_in_clusters = 0
+            cross_mines = None
+
+            # First, collect all cells that don't belong to any cluster
             for cluster in self.clusters:
                 cells_in_clusters = cells_in_clusters.union(cluster.cells_set)
-                mines_in_clusters += cluster.probable_mines
-
-            # Whatever is not in clusters is unaccounted for: cells and mines
             leftover_cells = set(self.covered_cells).\
                 difference(cells_in_clusters)
-            leftover_mines = self.remaining_mines - mines_in_clusters
 
             # If no unaccounted cells - can't do anything
             if not leftover_cells:
                 return
 
+            # Next, calculate accounted mines and solutions for all cluster's
+            # cross-matching. That is, all mines in all clusters: all
+            # solutions where we have that many mines
+            for cluster in self.clusters:
+
+                # Calculate all possible mine counts in clusters and the number
+                # of solutions permutations foreach count
+                if cross_mines is None:
+                    cross_mines = cluster.probable_mines.copy()
+                else:
+                    new_cross_mines = {}
+                    for already_mines, already_count in cross_mines.items():
+                        for mines, count in cluster.probable_mines.items():
+                            new_cross_mines[already_mines + mines] = already_count * count
+                    cross_mines = new_cross_mines
+
+            # Weight of each mine count: number of possible combinations
+            # in the leftover cells
+            cross_mines_weights = {mines: math.comb(len(leftover_cells),
+                                                    self.remaining_mines - mines) *
+                                   solutions for mines, solutions in cross_mines.items()
+                                   if self.remaining_mines - mines >= 0}
+
+            # Total weights for all mine counts
+            total_weights = sum(cross_mines_weights.values())
+
+            # If the cluster was not solver total weight would be zero.
+            # TODO: do something about it
+            if total_weights == 0:
+                return
+
+            # Total number of mines in all clusters (sum of count * probability)
+            mines_in_clusters = sum(mines * weight / total_weights
+                                 for mines, weight in cross_mines_weights.items())
+
             # And this is the probability of a mine in those cells
-            leftover_mine_chance = leftover_mines / len(leftover_cells)
+            leftover_mine_chance = (self.remaining_mines - mines_in_clusters) / \
+                                   len(leftover_cells)
+
+            # Fill in the probabilities
             for cell in leftover_cells:
                 self.probability.value[cell] = leftover_mine_chance
                 self.probability.source[cell] = "CSP Leftovers"
@@ -503,7 +545,7 @@ class MinesweeperSolver:
             return [all_zeros, ], None
 
         # Several calculation needed for the following solution methods
-        # Alist of all covered cells
+        # A list of all covered cells
         self.generate_all_covered()
         # Number of remaining mines
         self.generate_remaining_mines()
@@ -552,9 +594,9 @@ def main():
     '''
 
     settings = ms.GAME_TEST
-    settings = ms.GAME_BEGINNER
+    settings = ms.GAME_EXPERT
 
-    game = ms.MinesweeperGame(settings, seed=0.540283606970324)
+    game = ms.MinesweeperGame(settings, seed=0.9486082995058949)
     solver = MinesweeperSolver(settings)
 
     while game.status == ms.STATUS_ALIVE:

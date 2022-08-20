@@ -188,9 +188,8 @@ class CellCluster:
         # based on the number of mines in it
         self.solution_weights = []
 
-        # Estimated number of mines in cluster (adjusted for the different
-        # weight of different solutions)
-        self.probable_mines = None
+        # Dict of possible mine counts {mines: mine_count, ...}
+        self.probable_mines = {}
 
     def add(self, group):
         ''' Adding group to a cluster (assume they overlap).
@@ -395,28 +394,24 @@ class CellCluster:
                                       remaining_mines - solution_mines)
             self.solution_weights.append(solution_comb)
 
-    def calculate_probable_mines(self):
-        '''Based on solution and weights, calculate, how many mines we expect
-        this cluster to have, on average.
+    def possible_mine_counts(self):
+        ''' Based on solution and weights, calculate a dict with possible
+        mine counts. For example, {3: 4, 2: 1},  4 solutions with 3 mines,
+        1 solution with 2. Put it in self.probable_mines
+        Will be used for CSP Leftovers probability calculation.
         '''
-        # Solved cluster
-        solutions_mines = 0
-        solutions_count = 0
-        # Look at each solution
-        for solution_n, solution in enumerate(self.solutions):
-            # Number of mines would be equal to True's in solution
-            # And weight shows how many times this solution can be repeated
-            solutions_mines += solution.count(True) * \
-                self.solution_weights[solution_n]
-            solutions_count += self.solution_weights[solution_n]
 
-        # If solution was not empty: return average sum of all mines
-        # across all weighted solutions
-        if solutions_count != 0:
-            self.probable_mines = solutions_mines / solutions_count
+        # Cluster was solved
+        if self.solutions:
+            # Look at each solution
+            for solution in self.solutions:
+                mines_count = sum(1 for position in solution if position)
+                if mines_count not in self.probable_mines:
+                    self.probable_mines[mines_count] = 0
+                self.probable_mines[mines_count] += 1
             return
 
-        # If cluster wasn't solved (which is besically never happens
+        # If cluster wasn't solved (which is basically never happens
         # on 2D field, but can happen at higher dimensions):
         cells_mine_probabilities = {}
         for group in self.groups:
@@ -434,7 +429,7 @@ class CellCluster:
         total_mines = 0
         for cell, probabilities in cells_mine_probabilities.items():
             total_mines += sum(probabilities) / len(probabilities)
-        self.probable_mines = total_mines
+        self.probable_mines[int(total_mines)] = 1
 
     def __str__(self):
         output = f"Cluster with {len(self.groups)} group(s) "
