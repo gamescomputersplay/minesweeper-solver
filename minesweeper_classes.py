@@ -437,50 +437,49 @@ class CellCluster:
         return output
 
 
-class MineProbability:
+class CellProbabilityInfo:
+    '''Data about mine probability for one cell
+    '''
+
+    def __init__(self, mine_chance, source):
+        # Chance this cell is a mine (0 to 1)
+        self.mine_chance = mine_chance
+        # Which method was used to generate mine chance (for statistics)
+        self.source = source
+        # Chance it would be an opening (no mines in surrounding cells)
+        self.opening_chance = None
+
+
+class AllCellsProbability(dict):
     '''Class to work with probability-based information about cells
     '''
 
     def __init__(self):
-        # Probability of mines in this cell
-        self.value = {}
-        # Which method generated  this probability
-        self.source = {}
-        # Probability of getting a 0 in this cell
-        self.opening_chance = {}
+        # Dict with all probability info. Each element will be
+        # a CellProbabilityInfo object
+        self.cells = {}
 
     def pick_lowest_probability(self):
         ''' Pick and return the cell(s) with the lowest mine probability,
-        from the self.mine_probabilities.
-        Also, return lowest probability predicted for this cell.
+        and, if several, with highest opening probability.
         '''
-        lowest_probability = None
-        highest_opening_chance = None
-        least_likely_cells = []
+        # Copy the info into a list, so we can just sort it
+        cells = [(cell, cell_info.mine_chance, cell_info.opening_chance)
+                 for cell, cell_info in self.cells.items()]
 
-        # Go through the probability dict
-        for cell, probability in self.value.items():
+        # Sort by 1. mine chance 2. opening chance. Put the best at the end
+        cells.sort(key=lambda x: (x[1], -x[2]))
 
-            opening_chance = self.opening_chance[cell]
+        # This is teh best chances
+        _, best_mine_chance, best_opening_chance = cells[0]
+        best_cells = []
 
-            # Re-start the list if:
-            # - The list is empty
-            # - We found lower mine probability
-            # - Mine probability is the same, but opening probability is higher
-            if lowest_probability is None or \
-               probability < lowest_probability or \
-               probability == lowest_probability and \
-               opening_chance > highest_opening_chance:
-                least_likely_cells = [cell, ]
-                lowest_probability = probability
-                highest_opening_chance = opening_chance
+        for cell, mine_chance, opening_chance in cells:
+            if mine_chance == best_mine_chance and \
+               opening_chance == best_opening_chance:
+                best_cells.append(cell)
 
-            # Or if it is the same probability - add to the list
-            elif (probability == lowest_probability and
-                  highest_opening_chance == opening_chance):
-                least_likely_cells.append(cell)
-
-        return least_likely_cells
+        return best_cells
 
 
 def main():

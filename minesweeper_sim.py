@@ -5,6 +5,7 @@ The game is from minesweeper_game, the solver is from minesweeper_solver
 import time
 import math
 import random
+
 # progress bar
 from tqdm import tqdm
 # text table
@@ -203,7 +204,7 @@ class SolverStat:
         table.set_deco(Texttable.HEADER)
         table.set_cols_align(["r"] + ["l"] * (len(table_data[0]) - 1))
         table.add_rows(table_data)
-        return "Probability accuracy:\n" + table.draw() + "\n\n"
+        return "Probability accuracy control:\n" + table.draw() + "\n\n"
 
     def __str__(self):
         ''' Display the stats
