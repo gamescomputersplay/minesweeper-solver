@@ -386,7 +386,7 @@ class MinesweeperSolver:
             background_probability = \
                 self.remaining_mines / len(self.covered_cells)
             for cell in self.covered_cells:
-                self.probability.cells[cell] = \
+                self.probability[cell] = \
                     mc.CellProbabilityInfo(background_probability,
                                            "Background")
 
@@ -406,8 +406,8 @@ class MinesweeperSolver:
                     # If group's probability is higher than the background:
                     # Overwrite the probability result
                     if group_probability > \
-                       self.probability.cells[cell].mine_chance:
-                        self.probability.cells[cell] = \
+                       self.probability[cell].mine_chance:
+                        self.probability[cell] = \
                             mc.CellProbabilityInfo(group_probability, "Groups")
 
         def csp_probabilities(self):
@@ -417,7 +417,7 @@ class MinesweeperSolver:
             for cluster in self.clusters:
                 for cell, frequency in cluster.frequencies.items():
                     # Overwrite the probability result
-                    self.probability.cells[cell] = \
+                    self.probability[cell] = \
                         mc.CellProbabilityInfo(frequency, "CSP")
 
         def cluster_leftovers_probabilities(self):
@@ -492,7 +492,7 @@ class MinesweeperSolver:
 
             # Fill in the probabilities
             for cell in leftover_cells:
-                self.probability.cells[cell] = \
+                self.probability[cell] = \
                     mc.CellProbabilityInfo(leftover_mine_chance,
                                            "CSP Leftovers")
 
@@ -513,8 +513,8 @@ class MinesweeperSolver:
         '''
         # Go through all cells we have probability info for
         # (that would be all covered cells)
-        for cell, cell_info in self.probability.cells.items():
-            opening_chance = 1
+        for cell, cell_info in self.probability.items():
+            zero_chance = 1
             # Look at neighbors of each cell
             for neighbor in self.helper.cell_surroundings(cell):
                 # If there are any mines around, there is no chance of opening
@@ -523,11 +523,10 @@ class MinesweeperSolver:
                     break
                 # Otherwise each mine chance decrease opening chance
                 # by (1 - mine chance) times
-                if neighbor in self.probability.cells:
-                    opening_chance *= (1 - self.probability.cells
-                                       [neighbor].mine_chance)
+                if neighbor in self.probability:
+                    zero_chance *= (1 - self.probability[neighbor].mine_chance)
             else:
-                self.probability.cells[cell].opening_chance = opening_chance
+                self.probability[cell].opening_chance = zero_chance
 
     @staticmethod
     def pick_a_random_cell(cells):
@@ -592,14 +591,13 @@ class MinesweeperSolver:
         self.calculate_opening_chances()
 
         # Pick a cell that is least likely a mine
-        lucky_cells = self.probability.pick_lowest_probability()
+        lucky_cells = self.probability.pick_lowest_probability(self)
 
         if lucky_cells:
             lucky_cell = self.pick_a_random_cell(lucky_cells)
             self.last_move_info = ("Probability",
-                                   self.probability.cells[lucky_cell].source,
-                                   self.probability.cells
-                                   [lucky_cell].mine_chance)
+                                   self.probability[lucky_cell].source,
+                                   self.probability[lucky_cell].mine_chance)
             return [lucky_cell, ], None
 
         # Until the count method implemented, there is a chance of

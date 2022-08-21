@@ -241,13 +241,13 @@ class MinesweeperSim:
         # statistics collector object
         self.solver_stat = SolverStat()
 
-    def one_game(self, verbose=False):
+    def one_game(self, seed=None, verbose=False):
         ''' Playing one game.
         Verbose would print out the board for every move
         '''
 
         # Start the game, using one of the seeds
-        game = ms.MinesweeperGame(self.settings, self.game_seeds.pop())
+        game = ms.MinesweeperGame(self.settings, seed)
         solver = ms_solver.MinesweeperSolver(self.settings)
 
         while game.status == ms.STATUS_ALIVE:
@@ -290,7 +290,7 @@ class MinesweeperSim:
         # Run the simulation (with timing)
         start_time = time.time()
         for _ in iterator:
-            self.one_game()
+            self.one_game(seed=self.game_seeds.pop())
         self.spent_time = time.time() - start_time
 
         # Return the overall win rate

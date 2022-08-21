@@ -51,9 +51,16 @@ GAME_TEST = GameSettings((5, 4), 4)
 # Cell types
 CELL_MINE = -1
 # Others are for the self.uncovered field
-CELL_COVERED = -2  # Never clicked
-CELL_FALSE_MINE = -3  # Marked mine, but actually isn't
-CELL_EXPLODED_MINE = -4  # Explosion (clicked safe, but it was a mine)
+# Never clicked
+CELL_COVERED = -2
+# Marked mine, but actually isn't
+CELL_FALSE_MINE = -3
+# Explosion (clicked safe, but it was a mine)
+CELL_EXPLODED_MINE = -4
+# Neither covered, nor mine or number.
+#  Used in next move solvability prediction
+CELL_UNCOVERED = -5
+
 
 # MinesweeperGame.status: returned by the do_move, tells the result of the move
 STATUS_ALIVE = 0

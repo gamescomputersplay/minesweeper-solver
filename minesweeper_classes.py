@@ -2,7 +2,9 @@
 '''
 
 import math
+from dataclasses import dataclass
 
+import minesweeper_game as ms
 
 class MineGroup:
     ''' A MineGroup is a set of cells that are known
@@ -353,7 +355,13 @@ class CellCluster:
                     count_mines += self.solution_weights[solution_n]
             # Total in this case - not the number of solutions,
             # but weight of all solutions
-            self.frequencies[cell] = count_mines / sum(self.solution_weights)
+            if sum(self.solution_weights) > 0:
+                self.frequencies[cell] = count_mines / \
+                    sum(self.solution_weights)
+            # This shouldn't normally happen, but it may rarely happen during
+            # "next move" method, when "Uncovered but unknown" cell is added
+            else:
+                self.frequencies[cell] = 0
 
     def safe_cells(self):
         ''' Return list of guaranteed safe cells (0 in self.frequencies)
@@ -437,56 +445,84 @@ class CellCluster:
         return output
 
 
+@dataclass
 class CellProbabilityInfo:
     '''Data about mine probability for one cell
     '''
-
-    def __init__(self, mine_chance, source):
-        # Chance this cell is a mine (0 to 1)
-        self.mine_chance = mine_chance
-        # Which method was used to generate mine chance (for statistics)
-        self.source = source
-        # Chance it would be an opening (no mines in surrounding cells)
-        self.opening_chance = None
+    # Chance this cell is a mine (0 to 1)
+    mine_chance: float
+    # Which method was used to generate mine chance (for statistics)
+    source: str
+    # Chance it would be an opening (no mines in surrounding cells)
+    opening_chance: float = 0
+    # Number of solved cells in the next round, if this cell is uncovered
+    next_sure_clicks: int = 0
 
 
 class AllCellsProbability(dict):
     '''Class to work with probability-based information about cells
     '''
 
-    def __init__(self):
-        # Dict with all probability info. Each element will be
-        # a CellProbabilityInfo object
-        self.cells = {}
-
-    def pick_lowest_probability(self):
+    def pick_lowest_probability(self, solver):
         ''' Pick and return the cell(s) with the lowest mine probability,
         and, if several, with highest opening probability.
+        field is passed to test how well a cell generate openings
+        in the future round
         '''
         # Copy the info into a list, so we can just sort it
         cells = [(cell, cell_info.mine_chance, cell_info.opening_chance)
-                 for cell, cell_info in self.cells.items()]
+                 for cell, cell_info in self.items()]
 
         # Sort by 1. mine chance 2. opening chance. Put the best at the end
         cells.sort(key=lambda x: (x[1], -x[2]))
 
-        # This is teh best chances
+        # This is the best chances
         _, best_mine_chance, best_opening_chance = cells[0]
-        best_cells = []
+        cells_best_chances = []
 
+        # Pick cells with the best probability and opening chances
         for cell, mine_chance, opening_chance in cells:
             if mine_chance == best_mine_chance and \
                opening_chance == best_opening_chance:
-                best_cells.append(cell)
+                cells_best_chances.append(cell) 
 
-        return best_cells
+        # If we have only one best result - this is it
+        if len(cells_best_chances) == 1:
+            return cells_best_chances
+
+        # If not, here's another test: which one can potentially opens
+        # more cells in the next round
+
+        # Let's limit the number of options to 5
+        if len(cells_best_chances) > 5:
+            cells_best_chances = cells_best_chances[:5]
+
+        cells_best_next_move = []
+        for cell in cells_best_chances:
+            new_field = solver.field.copy()
+            new_field[cell] = ms.CELL_UNCOVERED
+            safe, _ = solver.solve(new_field, use_probability=False)
+            #cells_best_next_move.append((cell, len(safe) + len(mines)))
+            cells_best_next_move.append((cell, len(safe)))
+
+        cells_best_next_move.sort(key=lambda x: x[1], reverse=True)
+
+        # This is the best chances
+        _, best_next_move = cells_best_next_move[0]
+
+        final_cells = []
+        for cell, next_move in cells_best_next_move:
+            if next_move == best_next_move:
+                final_cells.append(cell)
+
+        return final_cells
 
 
 def main():
     ''' Display message that this is not a standalone file
     '''
     print("This file contains some classes for minesweeper.py")
-    print("There are no code to run in standalone mode")
+    print("There is no code to run in __main__ mode")
 
 
 if __name__ == "__main__":
