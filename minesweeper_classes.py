@@ -60,7 +60,7 @@ class MineGroup:
         return out
 
 
-class AllMineGroups:
+class AllGroups:
     ''' Functions to handle a group of MineGroup object:
     deduplicate them, generate subgroups ("at least" and "no more than")
     '''
@@ -158,7 +158,7 @@ class AllMineGroups:
         return f"MineGroups contains {len(self.mine_groups)} groups"
 
 
-class CellCluster:
+class GroupCluster:
     ''' CellCluster is a group of cells connected together by an overlapping
     list of groups. In other words mine/safe in any of the cell, can
     potentially trigger safe/mine in any other cell of the cluster.
@@ -445,6 +445,135 @@ class CellCluster:
         return output
 
 
+class AllClusters:
+    ''' Class that holds all clusters and leftovers data
+    '''
+
+    def __init__(self):
+        # List of all clusters
+        self.clusters = []
+
+        # History of clusters we already processed, so we won't have to
+        # solved them again (they can be quite time consuming)
+        # Also used to cache mine counts, {hash_value: mine_count}
+        self.clusters_history = {}
+
+        # Cells that are not in any cluster
+        self.leftover_cells = set()
+
+        # Count and weights of mines in leftover cells. For example:
+        # {3:20, 4:50} - there are 20 ways it can be 3 mines and 50 ways
+        # it can be 4 mines
+        self.leftover_weights = {}
+
+        # Average chance of a mine in leftover cells (None if NA)
+        self.leftover_mine_chance = None
+
+    def reset(self):
+        ''' CLear the list of clusters, but not the cluster history
+        '''
+        self.clusters = []
+        self.leftover_cells = set()
+        self.leftover_weights = {}
+        self.leftover_mine_chance = None
+
+    def calculate_all(self, covered_cells, remaining_mines):
+        '''Perform all cluster-related calculations: solve clusters,
+        calculate weights and mine frequencies etc. Check the history
+        in case this cluster was already solved
+        '''
+        for cluster in self.clusters:
+
+            # Cluster deduplication. If we solved this cluster already, ignore
+            # it, but get the probable mines  from the "cache" - we'll need it
+            # for probability method
+            if cluster.calculate_hash() in self.clusters_history:
+                cluster.probable_mines = \
+                    self.clusters_history[cluster.calculate_hash()]
+                continue
+
+            # Solve the cluster, including weights,
+            # frequencies and probable mines
+            cluster.solve_cluster(remaining_mines)
+            cluster.calculate_solution_weights(covered_cells,
+                                               remaining_mines)
+            cluster.calculate_frequencies()
+            cluster.possible_mine_counts()
+
+            # Save cluster's hash in history for deduplication
+            self.clusters_history[cluster.calculate_hash()] = \
+                cluster.probable_mines
+
+    def calculate_leftovers(self, covered_cells, remaining_mines):
+        '''Based on count and probabilities of mines in cluster, calculate
+        mines and probabilities in cells that don't belong to any clusters.
+        '''
+        # Rarely, there are no clusters (when covered area is walled off
+        # by mines, for example, like last 8)
+        if not self.clusters:
+            return
+
+        # Collect all cells and mine estimations from all clusters
+        cells_in_clusters = set()
+        cross_mines = None
+
+        # First, collect all cells that don't belong to any cluster
+        for cluster in self.clusters:
+            cells_in_clusters = cells_in_clusters.union(cluster.cells_set)
+        self.leftover_cells = set(covered_cells).\
+            difference(cells_in_clusters)
+
+        # If no unaccounted cells - can't do anything
+        if not self.leftover_cells:
+            return
+
+        # Next, calculate accounted mines and solutions for all cluster's
+        # cross-matching. That is, all mines in all clusters: all
+        # solutions where we have that many mines
+        for cluster in self.clusters:
+
+            # Calculate all possible mine counts in clusters and the number
+            # of solutions permutations foreach count
+            if cross_mines is None:
+                cross_mines = cluster.probable_mines.copy()
+            else:
+                new_cross_mines = {}
+                # These two loops allows to cross-check all clusters and
+                # have a list of all permutations (where mines are added
+                # and mine counts multiplied)
+                for already_mines, already_count in cross_mines.items():
+                    for mines, count in cluster.probable_mines.items():
+                        new_cross_mines[already_mines + mines] = \
+                            already_count * count
+                cross_mines = new_cross_mines
+
+        # Weight of each mine count: number of possible combinations
+        # in the leftover cells.
+        # Last line here is case there are permutations that exceed
+        # the total number of remaining mines
+        self.leftover_weights = {mines: math.comb(len(self.leftover_cells),
+                                remaining_mines - mines) * solutions
+                                for mines, solutions in cross_mines.items()
+                                if remaining_mines - mines >= 0}
+
+        # Total weights for all mine counts
+        total_weights = sum(self.leftover_weights.values())
+
+        # If the cluster was not solved total weight would be zero.
+        if total_weights == 0:
+            return
+
+        # Total number of mines in all clusters
+        # (sum of count * probability)
+        mines_in_clusters = sum(mines * weight / total_weights
+                                for mines, weight
+                                in self.leftover_weights.items())
+
+        # And this is the probability of a mine in those cells
+        self.leftover_mine_chance = (remaining_mines - mines_in_clusters) \
+            / len(self.leftover_cells)
+
+
 @dataclass
 class CellProbabilityInfo:
     '''Data about mine probability for one cell
@@ -459,7 +588,7 @@ class CellProbabilityInfo:
     next_sure_clicks: int = 0
 
 
-class AllCellsProbability(dict):
+class AllProbabilities(dict):
     '''Class to work with probability-based information about cells
     '''
 
@@ -484,7 +613,7 @@ class AllCellsProbability(dict):
         for cell, mine_chance, opening_chance in cells:
             if mine_chance == best_mine_chance and \
                opening_chance == best_opening_chance:
-                cells_best_chances.append(cell) 
+                cells_best_chances.append(cell)
 
         # If we have only one best result - this is it
         if len(cells_best_chances) == 1:
@@ -497,14 +626,25 @@ class AllCellsProbability(dict):
         if len(cells_best_chances) > 5:
             cells_best_chances = cells_best_chances[:5]
 
+        # For each cell in the shortlist, we change that cell to "uncovered"
+        # and run a solver on the resulting field, to see, where we have
+        # the maximum number of safe clicks
+        # List to store the results of "Safes in the Next move"
         cells_best_next_move = []
+        # Keep the copy of the original field
+        original_field = solver.field.copy()
+
         for cell in cells_best_chances:
-            new_field = solver.field.copy()
+            # Modify the cell, run the solver
+            new_field = original_field.copy()
             new_field[cell] = ms.CELL_UNCOVERED
             safe, _ = solver.solve(new_field, use_probability=False)
+
+            # Store the result in cells_best_next_move
             #cells_best_next_move.append((cell, len(safe) + len(mines)))
             cells_best_next_move.append((cell, len(safe)))
 
+        # Sort by the number of safe cells in the next move
         cells_best_next_move.sort(key=lambda x: x[1], reverse=True)
 
         # This is the best chances
