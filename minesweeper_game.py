@@ -57,9 +57,6 @@ CELL_COVERED = -2
 CELL_FALSE_MINE = -3
 # Explosion (clicked safe, but it was a mine)
 CELL_EXPLODED_MINE = -4
-# Neither covered, nor mine or number.
-#  Used in next move solvability prediction
-CELL_UNCOVERED = -5
 
 
 # MinesweeperGame.status: returned by the do_move, tells the result of the move

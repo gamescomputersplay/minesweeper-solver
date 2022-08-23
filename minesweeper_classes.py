@@ -4,8 +4,6 @@
 import math
 from dataclasses import dataclass
 
-import minesweeper_game as ms
-
 class MineGroup:
     ''' A MineGroup is a set of cells that are known
     to have a certain number of mines.
@@ -592,11 +590,9 @@ class AllProbabilities(dict):
     '''Class to work with probability-based information about cells
     '''
 
-    def pick_lowest_probability(self, solver):
+    def pick_lowest_probability(self):
         ''' Pick and return the cell(s) with the lowest mine probability,
         and, if several, with highest opening probability.
-        field is passed to test how well a cell generate openings
-        in the future round
         '''
         # Copy the info into a list, so we can just sort it
         cells = [(cell, cell_info.mine_chance, cell_info.opening_chance)
@@ -615,47 +611,10 @@ class AllProbabilities(dict):
                opening_chance == best_opening_chance:
                 cells_best_chances.append(cell)
 
-        # If we have only one best result - this is it
-        if len(cells_best_chances) == 1:
-            return cells_best_chances
-
-        # If not, here's another test: which one can potentially opens
-        # more cells in the next round
-
-        # Let's limit the number of options to 5
-        if len(cells_best_chances) > 5:
-            cells_best_chances = cells_best_chances[:5]
-
-        # For each cell in the shortlist, we change that cell to "uncovered"
-        # and run a solver on the resulting field, to see, where we have
-        # the maximum number of safe clicks
-        # List to store the results of "Safes in the Next move"
-        cells_best_next_move = []
-        # Keep the copy of the original field
-        original_field = solver.field.copy()
-
-        for cell in cells_best_chances:
-            # Modify the cell, run the solver
-            new_field = original_field.copy()
-            new_field[cell] = ms.CELL_UNCOVERED
-            safe, _ = solver.solve(new_field, use_probability=False)
-
-            # Store the result in cells_best_next_move
-            #cells_best_next_move.append((cell, len(safe) + len(mines)))
-            cells_best_next_move.append((cell, len(safe)))
-
-        # Sort by the number of safe cells in the next move
-        cells_best_next_move.sort(key=lambda x: x[1], reverse=True)
-
-        # This is the best chances
-        _, best_next_move = cells_best_next_move[0]
-
-        final_cells = []
-        for cell, next_move in cells_best_next_move:
-            if next_move == best_next_move:
-                final_cells.append(cell)
-
-        return final_cells
+        # Return cells with lowest mine chance and highest open chance.
+        # Later we'll add a logic to look playing "Future" boards to determine
+        # survivability over 2 and more moves. Not right now though.
+        return cells_best_chances
 
 
 def main():

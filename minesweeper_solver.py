@@ -509,7 +509,7 @@ class MinesweeperSolver:
         self.calculate_opening_chances()
 
         # Pick a cell that is least likely a mine
-        lucky_cells = self.probability.pick_lowest_probability(self)
+        lucky_cells = self.probability.pick_lowest_probability()
 
         if lucky_cells:
             lucky_cell = self.pick_a_random_cell(lucky_cells)
