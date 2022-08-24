@@ -145,43 +145,73 @@ class MinesweeperSolver:
         area minus what we know from groups. Used in method "Coverage" and
         allows for better background probability calculations.
         '''
-        # Reset
+
+        def coverage_attempt(accounted_cells, accounted_mines):
+            ''' Create coverage, given initial cells and mines that are
+            already in the initial coverage. Will use the greedy method
+            (use group that adds maximum cells first).
+            '''
+
+            while True:
+                # The idea is to find a group that has a largest number of
+                # unaccounted cells
+                best_count = None
+                best_group = None
+                for group in self.groups:
+
+                    # We only need "exactly" groups
+                    if group.group_type != "exactly":
+                        continue
+
+                    # If group overlaps with what we have so far -
+                    # we don't need such group
+                    if accounted_cells.intersection(group.cells):
+                        continue
+
+                    # Find the biggest group that we haven't touched yet
+                    if best_count is None or len(group.cells) > best_count:
+                        best_count = len(group.cells)
+                        best_group = group
+
+                # We have a matching group
+                if best_group is not None:
+                    # Cells from that group from now on are accounted for
+                    accounted_cells = accounted_cells.union(best_group.cells)
+                    # And so are  mines
+                    accounted_mines += best_group.mines
+                # No such  group was found: coverage is done
+                else:
+                    break
+
+            return accounted_cells, accounted_mines
+
+        # Reset the final variable
         self.unaccounted_group = None
 
-        # Initiate by having a mutable copy of all cells and all mines
-        accounted_cells = set()
-        accounted_mines = 0
+        # This method usually has no effect in the beginning of the game.
+        # Highest count of remaining cells when it worked was at 36-37.
+        if len(self.covered_cells) > 40:
+            return
 
-        while True:
-            # The idea is to find a group that has a largest number of
-            # unaccounted cells
-            best_count = None
-            best_group = None
-            for group in self.groups:
+        # Generate several coverage options.
+        # Put them into coverage_options
+        coverage_options = []
+        # FOr each option we are going to start with different group,
+        # and then proceed with greedy algorithm
+        for group in self.groups:
+            initial_cells = set(group.cells)
+            initial_mines = group.mines
+            coverage_option_cells, coverage_option_mines = \
+                coverage_attempt(initial_cells, initial_mines)
+            coverage_options.append((coverage_option_cells, coverage_option_mines))
 
-                # We only need "exactly" groups
-                if group.group_type != "exactly":
-                    continue
+        if not coverage_options:
+            return
 
-                # If group overlaps with what we have so far -
-                # we don't need such group
-                if accounted_cells.intersection(group.cells):
-                    continue
-
-                # Find the biggest group that we haven't touched yet
-                if best_count is None or len(group.cells) > best_count:
-                    best_count = len(group.cells)
-                    best_group = group
-
-            # We have a matching group
-            if best_group is not None:
-                # Cells from that group from now on are accounted for
-                accounted_cells = accounted_cells.union(best_group.cells)
-                # And so are  mines
-                accounted_mines += best_group.mines
-            # No such  group was found: coverage is done
-            else:
-                break
+        # Sort them by the number of cells in coverage
+        # Choose the one with the most cells
+        coverage_options.sort(key=lambda x: len(x[0]), reverse=True)
+        accounted_cells, accounted_mines = coverage_options[0]
 
         # unaccounted cells are all minus accounted
         unaccounted_cells = set(self.covered_cells).difference(accounted_cells)
