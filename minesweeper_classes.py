@@ -4,6 +4,7 @@
 import math
 from dataclasses import dataclass
 
+
 class MineGroup:
     ''' A MineGroup is a set of cells that are known
     to have a certain number of mines.
@@ -447,7 +448,7 @@ class AllClusters:
     ''' Class that holds all clusters and leftovers data
     '''
 
-    def __init__(self):
+    def __init__(self, covered_cells, remaining_mines):
         # List of all clusters
         self.clusters = []
 
@@ -462,20 +463,16 @@ class AllClusters:
         # Count and weights of mines in leftover cells. For example:
         # {3:20, 4:50} - there are 20 ways it can be 3 mines and 50 ways
         # it can be 4 mines
-        self.leftover_weights = {}
+        self.in_cluster_weights = {}
 
         # Average chance of a mine in leftover cells (None if NA)
         self.leftover_mine_chance = None
 
-    def reset(self):
-        ''' CLear the list of clusters, but not the cluster history
-        '''
-        self.clusters = []
-        self.leftover_cells = set()
-        self.leftover_weights = {}
-        self.leftover_mine_chance = None
+        # Bring these two from the solver object
+        self.covered_cells = covered_cells
+        self.remaining_mines = remaining_mines
 
-    def calculate_all(self, covered_cells, remaining_mines):
+    def calculate_all(self):
         '''Perform all cluster-related calculations: solve clusters,
         calculate weights and mine frequencies etc. Check the history
         in case this cluster was already solved
@@ -492,9 +489,9 @@ class AllClusters:
 
             # Solve the cluster, including weights,
             # frequencies and probable mines
-            cluster.solve_cluster(remaining_mines)
-            cluster.calculate_solution_weights(covered_cells,
-                                               remaining_mines)
+            cluster.solve_cluster(self.remaining_mines)
+            cluster.calculate_solution_weights(self.covered_cells,
+                                               self.remaining_mines)
             cluster.calculate_frequencies()
             cluster.possible_mine_counts()
 
@@ -502,7 +499,7 @@ class AllClusters:
             self.clusters_history[cluster.calculate_hash()] = \
                 cluster.probable_mines
 
-    def calculate_leftovers(self, covered_cells, remaining_mines):
+    def calculate_leftovers(self):
         '''Based on count and probabilities of mines in cluster, calculate
         mines and probabilities in cells that don't belong to any clusters.
         '''
@@ -518,7 +515,7 @@ class AllClusters:
         # First, collect all cells that don't belong to any cluster
         for cluster in self.clusters:
             cells_in_clusters = cells_in_clusters.union(cluster.cells_set)
-        self.leftover_cells = set(covered_cells).\
+        self.leftover_cells = set(self.covered_cells).\
             difference(cells_in_clusters)
 
         # If no unaccounted cells - can't do anything
@@ -549,13 +546,13 @@ class AllClusters:
         # in the leftover cells.
         # Last line here is case there are permutations that exceed
         # the total number of remaining mines
-        self.leftover_weights = {mines: math.comb(len(self.leftover_cells),
-                                remaining_mines - mines) * solutions
-                                for mines, solutions in cross_mines.items()
-                                if remaining_mines - mines >= 0}
+        self.in_cluster_weights = {mines: math.comb(len(self.leftover_cells),
+                                   self.remaining_mines - mines) * solutions
+                                   for mines, solutions in cross_mines.items()
+                                   if self.remaining_mines - mines >= 0}
 
         # Total weights for all mine counts
-        total_weights = sum(self.leftover_weights.values())
+        total_weights = sum(self.in_cluster_weights.values())
 
         # If the cluster was not solved total weight would be zero.
         if total_weights == 0:
@@ -565,15 +562,17 @@ class AllClusters:
         # (sum of count * probability)
         mines_in_clusters = sum(mines * weight / total_weights
                                 for mines, weight
-                                in self.leftover_weights.items())
+                                in self.in_cluster_weights.items())
+
+        # All mines not in clusters are leftovers
+        leftover_mines = self.remaining_mines - mines_in_clusters
 
         # And this is the probability of a mine in those cells
-        self.leftover_mine_chance = (remaining_mines - mines_in_clusters) \
-            / len(self.leftover_cells)
+        self.leftover_mine_chance = leftover_mines / len(self.leftover_cells)
 
 
 @dataclass
-class CellProbabilityInfo:
+class CellProbability:
     '''Data about mine probability for one cell
     '''
     # Chance this cell is a mine (0 to 1)

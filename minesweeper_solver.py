@@ -37,7 +37,8 @@ class MinesweeperSolver:
         self.groups = mc.AllGroups()
 
         # Placeholder for clusters (main element of CSP method)
-        self.all_clusters = mc.AllClusters()
+        self.all_clusters = \
+            mc.AllClusters(self.covered_cells, self.remaining_mines)
 
         # Placeholder for mine probability data
         # {cell: probability_of_it_being_a_mine}
@@ -110,7 +111,8 @@ class MinesweeperSolver:
         '''Populate self.clusters with cell clusters
         '''
         # Reset clusters
-        self.all_clusters.reset()
+        self.all_clusters = \
+            mc.AllClusters(self.covered_cells, self.remaining_mines)
         # Reset all "belong to cluster" information from the groups
         self.groups.reset_clusters()
 
@@ -203,7 +205,8 @@ class MinesweeperSolver:
             initial_mines = group.mines
             coverage_option_cells, coverage_option_mines = \
                 coverage_attempt(initial_cells, initial_mines)
-            coverage_options.append((coverage_option_cells, coverage_option_mines))
+            coverage_options.append((coverage_option_cells,
+                                     coverage_option_mines))
 
         if not coverage_options:
             return
@@ -357,7 +360,7 @@ class MinesweeperSolver:
         # Generate clusters
         self.generate_clusters()
         # DO all teh solving / calculate frequencies stuff
-        self.all_clusters.calculate_all(self.covered_cells, self.remaining_mines)
+        self.all_clusters.calculate_all()
 
         for cluster in self.all_clusters.clusters:
 
@@ -394,8 +397,8 @@ class MinesweeperSolver:
                 self.remaining_mines / len(self.covered_cells)
             for cell in self.covered_cells:
                 self.probability[cell] = \
-                    mc.CellProbabilityInfo(background_probability,
-                                           "Background")
+                    mc.CellProbability(background_probability,
+                                       "Background")
 
         def probabilities_for_groups(self):
             ''' Populate self.mine_probabilities, based on groups data
@@ -415,7 +418,7 @@ class MinesweeperSolver:
                     if group_probability > \
                        self.probability[cell].mine_chance:
                         self.probability[cell] = \
-                            mc.CellProbabilityInfo(group_probability, "Groups")
+                            mc.CellProbability(group_probability, "Groups")
 
         def csp_probabilities(self):
             ''' Calculate mine possibilities based on CSP
@@ -425,24 +428,25 @@ class MinesweeperSolver:
                 for cell, frequency in cluster.frequencies.items():
                     # Overwrite the probability result
                     self.probability[cell] = \
-                        mc.CellProbabilityInfo(frequency, "CSP")
+                        mc.CellProbability(frequency, "CSP")
 
         def cluster_leftovers_probabilities(self):
             ''' Use "leftovers" - cells that are not in any clusters.
             We can calculate average probability of mines based on the count
             and probability of mines in clusters.
             '''
-            self.all_clusters.calculate_leftovers(self.covered_cells, self.remaining_mines)
+            self.all_clusters.calculate_leftovers()
 
-            # For some reasons, calculation failed (probably clusters were too long)
+            # For some reasons, calculation failed
+            # (probably clusters were too long, or unsolvable)
             if self.all_clusters.leftover_mine_chance is None:
                 return
 
             # Fill in the probabilities
             for cell in self.all_clusters.leftover_cells:
                 self.probability[cell] = \
-                    mc.CellProbabilityInfo(self.all_clusters.leftover_mine_chance,
-                                           "CSP Leftovers")
+                    mc.CellProbability(self.all_clusters.leftover_mine_chance,
+                                       "CSP Leftovers")
 
         # Reset probabilities
         self.probability = mc.AllProbabilities()
