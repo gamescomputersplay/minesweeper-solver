@@ -33,20 +33,21 @@ class MinesweeperBot:
         # COordinates of the game n the screen
         self.cells_coordinates = None
 
+    @staticmethod
+    def add_alpha_color(colors):
+        ''' If color in colors presented with 3 values (RGB),
+        add another color, in RGBA and A = 255
+        '''
+        for color in colors:
+            if len(color) == 3:
+                colors.append(tuple(list(color) + [255]))
+
     def find_game(self, image, colors):
         '''Find game field by looking for squares of color "colors",
         placed in a grid. Return 2d array of (x1, y1, x2, y2) of found cells.
         image: PIL Image
         colors: list [color1, color2, ...] - any color will be matched
         '''
-
-        def add_alpha_color(colors):
-            ''' If color in colors presented with 3 values (RGB),
-            add another color, in RGBA and A = 255
-            '''
-            for color in colors:
-                if len(color) == 3:
-                    colors.append(tuple(list(color) + [255]))
 
         def find_square(left, top):
             ''' Check if x, y is a left top corner of a rectangle
@@ -147,20 +148,14 @@ class MinesweeperBot:
             game_width = len(set((left for left, _, _, _ in found)))
             game_height = len(set((top for _, top, _, _ in found)))
             game_mines = 0
-            # Standard MS games
-            if (game_width, game_height) == (8, 8):
-                game_mines = 10
-            if (game_width, game_height) == (16, 16):
-                game_mines = 40
-            if (game_width, game_height) == (30, 16):
-                game_mines = 99
-            # Google MS options
-            if (game_width, game_height) == (10, 8):
-                game_mines = 10
-            if (game_width, game_height) == (18, 14):
-                game_mines = 40
-            if (game_width, game_height) == (24, 20):
-                game_mines = 99
+
+            # Mine counts to recognize
+            game_presets = {(8, 8): 10, (9, 9): 10, (16, 16): 40, (30, 16): 99,
+                            (10, 8): 10, (18, 14): 40, (24, 20): 99}
+
+            if (game_width, game_height) in game_presets:
+                game_mines = game_presets[(game_width, game_height)]
+
             return (game_width, game_height), game_mines
 
         def arrange_cells(found):
@@ -171,7 +166,7 @@ class MinesweeperBot:
             return grid
 
         # Add RGBA to acceptable colors (some screenshots have them)
-        add_alpha_color(colors)
+        self.add_alpha_color(colors)
 
         # Pixels of the input image
         pixels = image.load()
@@ -214,6 +209,9 @@ def main():
     bot = MinesweeperBot()
     bot.find_game(screenshot, FIELD_COLORS_GOOGLE_MINESWEEPER)
 
+    screenshot = Image.open("mso-field.png")
+    bot = MinesweeperBot()
+    bot.find_game(screenshot, FIELD_COLORS_MINESWEEPER_ONLINE)
 
 if __name__ == "__main__":
     start = time.time()
