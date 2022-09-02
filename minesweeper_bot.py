@@ -9,8 +9,17 @@ import time
 from PIL import Image, ImageDraw
 import numpy as np
 
+import minesweeper_game as mg
+
 FIELD_COLORS_MINESWEEPER_X = [(192, 192, 192)]
 FIELD_COLORS_MINESWEEPER_ONLINE = [(198, 198, 198)]
+CELL_COLORS_MINESWEEPER_ONLINE = {
+    (55, 0, 255): 1,
+    (0, 135, 0): 2,
+    (201, 191, 191): 3,
+    (41, 41, 41): mg.CELL_MINE,
+    (250, 250, 250): mg.CELL_COVERED,
+    }
 FIELD_COLORS_GOOGLE_MINESWEEPER = [(146, 217, 43), (155, 223, 54)]
 
 
@@ -38,9 +47,17 @@ class MinesweeperBot:
         ''' If color in colors presented with 3 values (RGB),
         add another color, in RGBA and A = 255
         '''
-        for color in colors:
-            if len(color) == 3:
-                colors.append(tuple(list(color) + [255]))
+        # Same logic, but can be used for either list or dict
+        if isinstance(colors, list):
+            for color in colors:
+                if len(color) == 3:
+                    colors.append(tuple(list(color) + [255]))
+        if isinstance(colors, dict):
+            new_colors = {}
+            for color, value in colors.items():
+                if len(color) == 3:
+                    new_colors[tuple(list(color) + [255])] = value
+            colors.update(new_colors)
 
     def find_game(self, image, colors):
         '''Find game field by looking for squares of color "colors",
@@ -192,26 +209,67 @@ class MinesweeperBot:
         # Sort them into rows and columns, store it in self.cells_coordinates
         self.cells_coordinates = arrange_cells(found)
 
+    def read_field(self, image, color_map):
+        ''' Read the information from the field: covered and uncovered cells,
+        numbers, mines, etc. Return numpy array.
+        '''
+
+        def read_cell(image):
+            ''' Read the data from the image of one cell
+            '''
+            pixels = image.load()
+
+            # Scan the middle column of pixels in the image
+            middle = image.size[0] // 2
+
+            # Go bottom to top (it helps tell apart 3 and a flag)
+            for j in range(image.size[1]-1, -1, -1):
+
+                if pixels[middle, j] in color_map:
+                    return color_map[pixels[middle, j]]
+
+            return 0
+
+        # Add RGBA to acceptable colors (some screenshots have them)
+        self.add_alpha_color(color_map)
+
+        # Create empty numpy array, and go through all cells, filling it
+        field = np.zeros(self.game_shape, dtype=int)
+        for i in range(self.game_shape[0]):
+            for j in range(self.game_shape[1]):
+
+                left, top, right, bottom = self.cells_coordinates[i, j]
+                # Add one pixel more, to be able to tell apart
+                # covered and 0 (otherwise they are identical)
+                cell_box = left - 1, top - 1, right + 1, bottom + 1
+                cell = image.crop(cell_box)
+                field[i, j] = read_cell(cell)
+
+        return field
 
 def main():
     ''' Some testing functions
     '''
 
-    screenshot = Image.open("msx-beg.png")
-    bot = MinesweeperBot()
-    bot.find_game(screenshot, FIELD_COLORS_MINESWEEPER_X)
+    # screenshot = Image.open("msx-beg.png")
+    # bot = MinesweeperBot()
+    # bot.find_game(screenshot, FIELD_COLORS_MINESWEEPER_X)
 
-    screenshot = Image.open("mso-exp.png")
-    bot = MinesweeperBot()
-    bot.find_game(screenshot, FIELD_COLORS_MINESWEEPER_ONLINE)
+    # screenshot = Image.open("mso-exp.png")
+    # bot = MinesweeperBot()
+    # bot.find_game(screenshot, FIELD_COLORS_MINESWEEPER_ONLINE)
 
-    screenshot = Image.open("msg-int.png")
-    bot = MinesweeperBot()
-    bot.find_game(screenshot, FIELD_COLORS_GOOGLE_MINESWEEPER)
+    # screenshot = Image.open("msg-int.png")
+    # bot = MinesweeperBot()
+    # bot.find_game(screenshot, FIELD_COLORS_GOOGLE_MINESWEEPER)
 
     screenshot = Image.open("mso-field.png")
     bot = MinesweeperBot()
     bot.find_game(screenshot, FIELD_COLORS_MINESWEEPER_ONLINE)
+    screenshot = Image.open("mso-move.png")
+    game = mg.MinesweeperGame()
+    game.field = bot.read_field(screenshot, CELL_COLORS_MINESWEEPER_ONLINE)
+    print(game.field2str(game.field))
 
 if __name__ == "__main__":
     start = time.time()
