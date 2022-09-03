@@ -11,16 +11,62 @@ import numpy as np
 
 import minesweeper_game as mg
 
-FIELD_COLORS_MINESWEEPER_X = [(192, 192, 192)]
-FIELD_COLORS_MINESWEEPER_ONLINE = [(198, 198, 198)]
-CELL_COLORS_MINESWEEPER_ONLINE = {
-    (55, 0, 255): 1,
-    (0, 135, 0): 2,
-    (201, 191, 191): 3,
-    (41, 41, 41): mg.CELL_MINE,
-    (250, 250, 250): mg.CELL_COVERED,
-    }
-FIELD_COLORS_GOOGLE_MINESWEEPER = [(146, 217, 43), (155, 223, 54)]
+class MinesweeperBotSettings():
+    ''' Various data, needed to read the field information from screenshot.
+    Different for different minesweeper version (Minesweeper X,
+    Online minesweeper, Google minesweeper etc.
+    Default one is for Minesweeper X.
+    '''
+
+    def __init__(self, field_color, cells_colors, minimum_cell_size=10):
+
+        # Color used to find a grid. This should be the most central color
+        # of a closed cell (or several colors if it is a chess-board-like,
+        # as Google Minesweeper is)
+        self.field_color = field_color
+
+        # Distinct color of a cell (numbers + covered cells)
+        # Whatever is not here will be considered zero.
+        # Flagged mines will be stored in the Bot,
+        # as they are easily confused with 3s
+        self.cells_colors = cells_colors
+
+        # Minimum size to be considered a potential cell (to rule out random small specks)
+        self.minimum_cell_size = minimum_cell_size
+
+    def copy(self):
+        '''Create a copy of itself (to reuse default settings)
+        '''
+        new_settings = MinesweeperBotSettings(
+            self.field_color.copy(),
+            self.cells_colors.copy(),
+            self.minimum_cell_size
+        )
+        return new_settings
+
+SETTINGS_DEFAULT = MinesweeperBotSettings(
+    field_color = [(192, 192, 192)],
+    cells_colors = {
+        (0, 0, 255): 1,
+        (0, 128, 0): 2,
+        (255, 0, 0): 3,
+        (0, 0, 128): 4,
+        (128, 0, 0): 5,
+        (0, 128, 128): 6,
+        (0, 0, 0): 7,
+        (128, 128, 128): 8,
+        (158, 0, 0): mg.CELL_EXPLODED_MINE,
+        (235, 235, 235): mg.CELL_COVERED,
+        }
+    )
+
+SETTINGS_MINESWEEPER_X = SETTINGS_DEFAULT.copy()
+
+SETTINGS_MINESWEEPER_ONLINE = SETTINGS_DEFAULT.copy()
+SETTINGS_MINESWEEPER_ONLINE.field_color = [(198, 198, 198)]
+
+SETTING_GOOGLE_MINESWEEPER = SETTINGS_DEFAULT.copy()
+SETTING_GOOGLE_MINESWEEPER.field_color = [(146, 217, 43), (155, 223, 54)]
 
 
 class MinesweeperBot:
@@ -28,9 +74,9 @@ class MinesweeperBot:
     read the cells' values, click and so on
     '''
 
-    MINIMUM_CELL_SIZE = 10
-
-    def __init__(self):
+    def __init__(self, settings=SETTINGS_MINESWEEPER_X):
+        # Bot settings, which colors are used to find and read the field
+        self.settings = settings
         # The shape of the field (width and height for 2D games,
         # or higher order tuple for n-dimensional games)
         self.game_shape = None
@@ -59,7 +105,7 @@ class MinesweeperBot:
                     new_colors[tuple(list(color) + [255])] = value
             colors.update(new_colors)
 
-    def find_game(self, image, colors):
+    def find_game(self, image):
         '''Find game field by looking for squares of color "colors",
         placed in a grid. Return 2d array of (x1, y1, x2, y2) of found cells.
         image: PIL Image
@@ -104,14 +150,14 @@ class MinesweeperBot:
             # Scan image pixel by pixel, find one from "colors"
             for i in range(image.size[0]):
                 for j in range(image.size[1]):
-                    if pixels[i, j] in colors:
+                    if pixels[i, j] in self.settings.field_color:
 
                         # When  found check if it is a square
                         # (technically, rectangles are okay too)
                         left, top, right, bottom = find_square(i, j)
 
                         # if it is - store 4 coordinates in "found"
-                        if left and right - left > self.MINIMUM_CELL_SIZE:
+                        if left and right - left > self.settings.minimum_cell_size:
                             found.append((left, top, right, bottom))
 
                             # Fill it with black so it would not be found again
@@ -183,7 +229,7 @@ class MinesweeperBot:
             return grid
 
         # Add RGBA to acceptable colors (some screenshots have them)
-        self.add_alpha_color(colors)
+        self.add_alpha_color(self.settings.field_color)
 
         # Pixels of the input image
         pixels = image.load()
@@ -209,7 +255,7 @@ class MinesweeperBot:
         # Sort them into rows and columns, store it in self.cells_coordinates
         self.cells_coordinates = arrange_cells(found)
 
-    def read_field(self, image, color_map):
+    def read_field(self, image):
         ''' Read the information from the field: covered and uncovered cells,
         numbers, mines, etc. Return numpy array.
         '''
@@ -219,25 +265,24 @@ class MinesweeperBot:
             '''
             pixels = image.load()
 
-            # Scan the middle column of pixels in the image
-            middle = image.size[0] // 2
-
             # Go bottom to top (it helps tell apart 3 and a flag)
-            for j in range(image.size[1]-1, -1, -1):
-
-                if pixels[middle, j] in color_map:
-                    return color_map[pixels[middle, j]]
+            for i in range(image.size[0]):
+                for j in range(image.size[1]):
+                    #print(pixels[middle, j])
+                    if pixels[i, j] in self.settings.cells_colors:
+                        return self.settings.cells_colors[pixels[i, j]]
 
             return 0
 
         # Add RGBA to acceptable colors (some screenshots have them)
-        self.add_alpha_color(color_map)
+        self.add_alpha_color(self.settings.cells_colors)
 
         # Create empty numpy array, and go through all cells, filling it
         field = np.zeros(self.game_shape, dtype=int)
         for i in range(self.game_shape[0]):
             for j in range(self.game_shape[1]):
-
+                #if i != 5 or j != 6:
+                #    continue
                 left, top, right, bottom = self.cells_coordinates[i, j]
                 # Add one pixel more, to be able to tell apart
                 # covered and 0 (otherwise they are identical)
@@ -250,25 +295,12 @@ class MinesweeperBot:
 def main():
     ''' Some testing functions
     '''
-
-    # screenshot = Image.open("msx-beg.png")
-    # bot = MinesweeperBot()
-    # bot.find_game(screenshot, FIELD_COLORS_MINESWEEPER_X)
-
-    # screenshot = Image.open("mso-exp.png")
-    # bot = MinesweeperBot()
-    # bot.find_game(screenshot, FIELD_COLORS_MINESWEEPER_ONLINE)
-
-    # screenshot = Image.open("msg-int.png")
-    # bot = MinesweeperBot()
-    # bot.find_game(screenshot, FIELD_COLORS_GOOGLE_MINESWEEPER)
-
-    screenshot = Image.open("mso-field.png")
-    bot = MinesweeperBot()
-    bot.find_game(screenshot, FIELD_COLORS_MINESWEEPER_ONLINE)
-    screenshot = Image.open("mso-move.png")
+    screenshot = Image.open("mso-1.png")
+    bot = MinesweeperBot(SETTINGS_MINESWEEPER_ONLINE)
+    bot.find_game(screenshot)
+    screenshot = Image.open("mso-4.png")
     game = mg.MinesweeperGame()
-    game.field = bot.read_field(screenshot, CELL_COLORS_MINESWEEPER_ONLINE)
+    game.field = bot.read_field(screenshot)
     print(game.field2str(game.field))
 
 if __name__ == "__main__":
