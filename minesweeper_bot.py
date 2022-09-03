@@ -6,11 +6,12 @@ Uses minesweeper solver in minesweeper_solver.py
 import time
 
 import pyautogui
-from PIL import Image, ImageDraw
 import keyboard
 import numpy as np
+from PIL import Image, ImageDraw
 
 import minesweeper_game as mg
+import minesweeper_solver as ms
 
 
 class MinesweeperBotSettings():
@@ -50,6 +51,8 @@ SETTINGS_MINESWEEPER_X = MinesweeperBotSettings(
         "samples/msx-125-2.png": 2,
         "samples/msx-125-3.png": 3,
         "samples/msx-125-4.png": 4,
+        "samples/msx-125-5.png": 5,
+        "samples/msx-125-6.png": 6,
         "samples/msx-125-covered.png": mg.CELL_COVERED,
         "samples/msx-125-mine.png": mg.CELL_MINE,
         "samples/msx-125-flag.png": mg.CELL_MINE,
@@ -78,6 +81,9 @@ class MinesweeperBot:
 
         # Coordinates of the game on the screen
         self.cells_coordinates = None
+
+        # Placeholder for the solver
+        self.solver = None
 
     def find_game(self, image=None):
         '''Find game field by looking for squares of color "colors",
@@ -233,6 +239,10 @@ class MinesweeperBot:
         # Sort them into rows and columns, store it in self.cells_coordinates
         self.cells_coordinates = arrange_cells(found)
 
+        # Initiate solver
+        settings = mg.GameSettings(self.game_shape, self.game_mines)
+        self.solver = ms.MinesweeperSolver(settings)
+
     def read_field(self, image):
         ''' Read the information from the field: covered and uncovered cells,
         numbers, mines, etc. Return numpy array.
@@ -289,38 +299,98 @@ class MinesweeperBot:
                     filename = f"samples/unknown-{i}-{j}.png"
                     cell.save(filename)
                     raise Exception(
-                        f"Can't read cell at {i}x{j}, saved as {filename}")
+                        f"Can't read cell at ({i}, {j}), saved as {filename}")
                 # Otherwise, store the read number in field array
                 field[i, j] = cell_value
 
         return field
 
+    def do_clicks(self, safe, mines):
+        '''Given the safe and mines coordinates, do the clicks
+        '''
+        for button, coord_list in zip(("left", "right"), (safe, mines)):
+            if not coord_list:
+                continue
+            for coord in coord_list:
+                left, top, right, bottom = self.cells_coordinates[coord]
+                x_coord = (left + right) // 2
+                y_coord = (top + bottom) // 2
+                pyautogui.click(x_coord, y_coord, button=button)
+
+    def is_dead(self, field):
+        '''Check if there is an exploded mine on the field,
+        which means the game is over
+        '''
+        for i in range(self.game_shape[0]):
+            for j in range(self.game_shape[1]):
+                if field[i, j] == mg.CELL_EXPLODED_MINE:
+                    return True
+        return False
+
+    def has_covered(self, field):
+        '''Check if there are any covered cells left
+        '''
+        for i in range(self.game_shape[0]):
+            for j in range(self.game_shape[1]):
+                if field[i, j] == mg.CELL_COVERED:
+                    return True
+        return False
+
     def make_a_move(self, screenshot=None):
         ''' Read the situation on the board,
         run a solver for teh next move, click the cells
         '''
+        actually_do_clicks = False
+        # Not screenshot means this is not a test,
+        # we are actually playing the game
         if screenshot is None:
+            actually_do_clicks = True
             screenshot = pyautogui.screenshot()
 
-        game = mg.MinesweeperGame()
-        game.field = self.read_field(screenshot)
-        print(game.field2str(game.field))
+        # Read the field
+        field = self.read_field(screenshot)
+
+        # Check if the game is over, obe way or another
+        if self.is_dead(field):
+            return mg.STATUS_DEAD
+        if not self.has_covered(field):
+            return mg.STATUS_WON
+
+        # Get the solution to the current field
+        safe, mines = self.solver.solve(field)
+
+        # If it is not testing - do the clicks
+        if actually_do_clicks:
+            self.do_clicks(safe, mines)
+
+        # This status is more for consistency
+        return mg.STATUS_ALIVE
 
 
 def main():
     ''' Some testing functions
     '''
 
+    # Create a new bot object
     bot = MinesweeperBot(SETTINGS_MINESWEEPER_X)
-    bot.find_game(Image.open("msx-1.png"))
-    field = bot.read_field(Image.open("msx-2.png"))
-    game = mg.MinesweeperGame()
-    print(game.field2str(field))
+
+    # Find the game on the screen
+    bot.find_game()
+
+    # Endless cycle to make moves
+    while True:
+        result = bot.make_a_move()
+        # Out if we won or lost
+        if result == mg.STATUS_DEAD:
+            print("I died")
+            break
+        if result == mg.STATUS_WON:
+            print("I won")
+            break
 
 
 if __name__ == "__main__":
     start = time.time()
-    main()
-    # keyboard.add_hotkey('f10', main)
-    # keyboard.wait('esc')
+    keyboard.add_hotkey('f10', main)
+    keyboard.wait('esc')
     print(time.time() - start)
