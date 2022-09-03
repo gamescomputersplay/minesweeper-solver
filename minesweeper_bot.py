@@ -85,6 +85,9 @@ class MinesweeperBot:
         # Placeholder for the solver
         self.solver = None
 
+        # Cell recognition cache
+        self.cell_cache = {}
+
     def find_game(self, image=None):
         '''Find game field by looking for squares of color "colors",
         placed in a grid. Return 2d array of (x1, y1, x2, y2) of found cells.
@@ -261,21 +264,40 @@ class MinesweeperBot:
                                           pixels2[i, j][position])
             return difference
 
+        def get_image_hash(image):
+            ''' Calculate hash of otherwise unhashable image
+            '''
+            image_data = []
+            pixels = image.load()
+            for i in range(image.size[0]):
+                for j in range(image.size[1]):
+                    image_data.append(pixels[i, j])
+            return hash(tuple(image_data))
+
         def read_cell(image):
             ''' Read the data from the image of one cell
             '''
+            # Check if we maybe saw this one before
+            image_hash = get_image_hash(image)
+            if image_hash in self.cell_cache:
+                return self.cell_cache[image_hash]
+
             # Compare the image with known  cell samples
             best_fit_difference = None
             best_fit_value = None
             for sample, value in self.settings.samples:
+                # Calculate difference with a sample
                 difference = get_difference(sample, image)
-
+                # Check with all and use the closest one, but only i
+                # f difference is smaller than sensitivity.
                 if difference < self.settings.sample_sensitivity:
                     if best_fit_difference is None \
                        or difference < best_fit_difference:
                         best_fit_difference = difference
                         best_fit_value = value
             if best_fit_value is not None:
+                # Store the result in cache
+                self.cell_cache[image_hash] = best_fit_value
                 return best_fit_value
             return None
 
@@ -370,6 +392,10 @@ class MinesweeperBot:
 def main():
     ''' Some testing functions
     '''
+
+    # Default pause between clicks is is 0.1 (meaning there will be
+    # 40 seconds of pause on the Expert game). Let's speed it up.
+    pyautogui.PAUSE = 0.01
 
     # Create a new bot object
     bot = MinesweeperBot(SETTINGS_MINESWEEPER_X)
