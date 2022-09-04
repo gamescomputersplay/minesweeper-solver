@@ -58,6 +58,15 @@ CELL_FALSE_MINE = -3
 # Explosion (clicked safe, but it was a mine)
 CELL_EXPLODED_MINE = -4
 
+# Characters to show for different statuses
+# 80 is the highest possible number of neighbors (in a 4d game)
+LEGEND = {**{
+    CELL_MINE: "*",
+    CELL_COVERED: " ",
+    CELL_FALSE_MINE: "X",
+    CELL_EXPLODED_MINE: "!",
+    0: "."
+}, **{i: str(i) for i in range(1, 81)}}
 
 # MinesweeperGame.status: returned by the do_move, tells the result of the move
 STATUS_ALIVE = 0
@@ -437,16 +446,6 @@ class MinesweeperGame:
         height = field_to_show.shape[1]
         width = field_to_show.shape[0]
 
-        # Characters to show for different statuses
-        # 80 is the highest possible number of neighbors (in a 4d game)
-        characters_to_display = {**{
-            CELL_MINE: "*",
-            CELL_COVERED: " ",
-            CELL_FALSE_MINE: "X",
-            CELL_EXPLODED_MINE: "!",
-            0: "."
-        }, **{i: str(i) for i in range(1, 81)}}
-
         # Add all data to this string
         output = ""
 
@@ -478,7 +477,7 @@ class MinesweeperGame:
                 cell_value = field_to_show[col, row]
 
                 # Display the character according to characters_to_display
-                output += characters_to_display[cell_value] + " "
+                output += LEGEND[cell_value] + " "
 
             # Right border
             output += "!\n"
@@ -625,7 +624,7 @@ def main():
     game = MinesweeperGame(settings=GAME_TEST, seed=seed)
 
     # For debugging: check out the field
-    print(game.field2str(game.field))
+    # print(game.field2str(game.field))
 
     # Keep making moves, while alive
     while game.status == STATUS_ALIVE:
