@@ -53,11 +53,13 @@ SETTINGS_MINESWEEPER_X = MinesweeperBotSettings(
         "samples/msx-125-4.png": 4,
         "samples/msx-125-5.png": 5,
         "samples/msx-125-6.png": 6,
+        "samples/msx-125-7.png": 7,
         "samples/msx-125-covered.png": mg.CELL_COVERED,
         "samples/msx-125-mine.png": mg.CELL_MINE,
         "samples/msx-125-flag.png": mg.CELL_MINE,
         "samples/msx-125-explosion.png": mg.CELL_EXPLODED_MINE,
-    }
+        "samples/msx-125-false.png": mg.CELL_FALSE_MINE,
+        }
     )
 
 # SETTING_GOOGLE_MINESWEEPER.field_color = [(146, 217, 43), (155, 223, 54)]
@@ -87,6 +89,10 @@ class MinesweeperBot:
 
         # Cell recognition cache
         self.cell_cache = {}
+
+        # Default pause between clicks is is 0.1 (meaning there will be
+        # 40 seconds of pause on the Expert game). Let's speed it up.
+        pyautogui.PAUSE = 0.01
 
     def find_game(self, image=None):
         '''Find game field by looking for squares of color "colors",
@@ -371,6 +377,8 @@ class MinesweeperBot:
 
         # Read the field
         field = self.read_field(screenshot)
+        #game = mg.MinesweeperGame()
+        #print(game.field2str(field))
 
         # Check if the game is over, obe way or another
         if self.is_dead(field):
@@ -389,13 +397,9 @@ class MinesweeperBot:
         return mg.STATUS_ALIVE
 
 
-def main():
-    ''' Some testing functions
+def use_bot(games_to_play=100):
+    ''' Play several games
     '''
-
-    # Default pause between clicks is is 0.1 (meaning there will be
-    # 40 seconds of pause on the Expert game). Let's speed it up.
-    pyautogui.PAUSE = 0.01
 
     # Create a new bot object
     bot = MinesweeperBot(SETTINGS_MINESWEEPER_X)
@@ -403,17 +407,44 @@ def main():
     # Find the game on the screen
     bot.find_game()
 
-    # Endless cycle to make moves
-    while True:
-        result = bot.make_a_move()
-        # Out if we won or lost
-        if result == mg.STATUS_DEAD:
-            print("I died")
-            break
-        if result == mg.STATUS_WON:
-            print("I won")
-            break
+    wins = 0
 
+    for game in range(games_to_play):
+
+        print(f"Game #{game + 1}.", end=" ")
+
+        # Endless cycle to make moves
+        while True:
+
+            # Read a screen, do clicks
+            result = bot.make_a_move()
+
+            # Quick pause to make sure game reacts
+            time.sleep(.01)
+
+            # Out if we won or lost
+            if result == mg.STATUS_DEAD:
+                print("I died.", end=" ")
+                break
+            if result == mg.STATUS_WON:
+                print("I won.", end=" ")
+                wins += 1
+                break
+
+        print(f"Win rate: {wins / (game + 1):.2%}")
+
+        # CLick new game button
+        left = bot.cells_coordinates[0, 0, 0]
+        right = bot.cells_coordinates[-1, 0, 2]
+        top = bot.cells_coordinates[0, 0, 1]
+        new_game = ((left + right) // 2, top - 30)
+        time.sleep(0.5)
+        pyautogui.click(new_game)
+
+def main():
+    '''Run the bot program
+    '''
+    use_bot(100)
 
 if __name__ == "__main__":
     start = time.time()
