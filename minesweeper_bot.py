@@ -12,7 +12,7 @@ from PIL import Image, ImageDraw
 
 import minesweeper_game as mg
 import minesweeper_solver as ms
-
+import minesweeper_sim
 
 class MinesweeperBotSettings():
     ''' Various data, needed to read the field information from screenshot.
@@ -105,6 +105,8 @@ class MinesweeperBot:
 
         # Placeholder for the solver
         self.solver = None
+
+        self.bot_stat = minesweeper_sim.SolverStat()
 
         # Cell recognition cache
         self.cell_cache = {}
@@ -412,13 +414,18 @@ class MinesweeperBot:
         # Check if the game is over, obe way or another
         if self.is_dead(field):
             log_field(field)
+            self.bot_stat.add_game(mg.STATUS_DEAD)
             return mg.STATUS_DEAD
         if not self.has_covered(field):
             log_field(field)
+            self.bot_stat.add_game(mg.STATUS_WON)
             return mg.STATUS_WON
 
         # Get the solution to the current field
         safe, mines = self.solver.solve(field)
+
+        # Track statistics
+        self.bot_stat.add_move(self.solver.last_move_info, safe, mines)
 
         # If it is not testing - do the clicks
         if actually_do_clicks:
@@ -451,8 +458,10 @@ def use_bot(games_to_play=100):
             # Read a screen, do clicks
             result = bot.make_a_move()
 
-            # Quick pause to make sure game reacts
-            time.sleep(.01)
+            # Quick pause to make sure game have time to react
+            # and we get updated info on the screen
+            # Seems to be REALLY important to the win rate
+            time.sleep(.05)
 
             # Out if we won or lost
             if result == mg.STATUS_DEAD:
@@ -465,18 +474,24 @@ def use_bot(games_to_play=100):
 
         print(f"Win rate: {wins / (game + 1):.2%}")
 
-        # CLick new game button
+        # CLick the new game button
         left = bot.cells_coordinates[0, 0, 0]
         right = bot.cells_coordinates[-1, 0, 2]
         top = bot.cells_coordinates[0, 0, 1]
         new_game = ((left + right) // 2, top - 30)
+
+        # This pause is for humans watching the game
         time.sleep(0.5)
         pyautogui.click(new_game)
+        # This pause for minesweeper to refresh the screen
+        time.sleep(0.3)
+
+    print(bot.bot_stat)
 
 def main():
     '''Run the bot program
     '''
-    use_bot(100)
+    use_bot(20)
 
 if __name__ == "__main__":
     start = time.time()
