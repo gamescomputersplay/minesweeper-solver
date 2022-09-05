@@ -11,8 +11,8 @@ from tqdm import tqdm
 # text table
 from texttable import Texttable
 
-import minesweeper_game as ms
-import minesweeper_solver as ms_solver
+import minesweeper_game as mg
+import minesweeper_solver as ms
 
 # Whether to display progress bar for a simulation
 # May have issues on some IDEs
@@ -73,10 +73,10 @@ class SolverStat:
         ''' Add game information
         '''
         self.games += 1
-        if result == ms.STATUS_WON:
+        if result == mg.STATUS_WON:
             self.wins += 1
         # If we lost
-        elif result == ms.STATUS_DEAD:
+        elif result == mg.STATUS_DEAD:
             # Than blame the latest probability method
             # Mark it by inverting the chance value
             self.probability_data[self.last_probability_method][-1] = \
@@ -223,17 +223,38 @@ class MinesweeperSim:
     ''' Methods to handle minesweeper game simulation
     '''
 
-    def __init__(self, runs, settings, seed=None):
-        self.runs = runs
+    def __init__(self, settings=mg.GAME_EXPERT, runs=100, seed=None, import_file=None):
+
+        def load_import_file(import_file):
+            ''' Read data from the file with saved games
+            '''
+            games = []
+            with open(import_file, "r", encoding="utf-8") as file:
+                for line in file:
+                    games.append(line.strip())
+            return games
+
+        # Game settings (field dimensions, mine count)
         self.settings = settings
 
-        # Use seed, if seed passed
-        if seed is not None:
-            random.seed(seed)
+        # If import file passed: load games from it, set the runs to the length of the file
+        if import_file is not None:
+            self.game_fields  = load_import_file(import_file)
+            self.runs = len(self.game_fields)
+            self.game_seeds = None
 
-        # Generate starting seeds for all games (do it now, so random
-        # calls in the solver would not affect it).
-        self.game_seeds = [random.random() for _ in range(self.runs)]
+        # Otherwise, games will be created from seeds
+        else:
+            self.game_fields = None
+            self.runs = runs
+
+            # Use initial seed, if seed passed
+            if seed is not None:
+                random.seed(seed)
+
+            # Generate starting seeds for all games (do it now, so random
+            # calls in the solver would not affect it).
+            self.game_seeds = [random.random() for _ in range(self.runs)]
 
         # Placeholder for timing
         self.spent_time = None
@@ -243,15 +264,19 @@ class MinesweeperSim:
 
         self.solver = None
 
-    def one_game(self, seed=None, verbose=False):
+    def one_game(self, field=None, seed=None, verbose=False):
         ''' Playing one game.
         Verbose would print out the board for every move
         '''
 
+        # If field passed in, use it to generate the game
+        if field is not None:
+            game = mg.MinesweeperGame(self.settings, field_str=field)
         # Start the game, using one of the seeds
-        game = ms.MinesweeperGame(self.settings, seed)
+        else:
+            game = mg.MinesweeperGame(self.settings, seed=seed)
 
-        while game.status == ms.STATUS_ALIVE:
+        while game.status == mg.STATUS_ALIVE:
 
             safe, mines = self.solver.solve(game.uncovered)
             if verbose:
@@ -270,12 +295,12 @@ class MinesweeperSim:
 
         # Notify if deterministic method resulted in death
         # This should not happen though
-        if game.status == ms.STATUS_DEAD and \
+        if game.status == mg.STATUS_DEAD and \
            self.solver.last_move_info[0] != "Probability":
             print(f"Warning: death by method '{self.solver.last_move_info[0]}'")
 
         if verbose:
-            print(f"Result: {ms.STATUS_MESSAGES[game.status]}")
+            print(f"Result: {mg.STATUS_MESSAGES[game.status]}")
 
         return game.status
 
@@ -290,10 +315,15 @@ class MinesweeperSim:
 
         # Run the simulation (with timing)
         start_time = time.time()
-        self.solver = ms_solver.MinesweeperSolver(self.settings)
+        self.solver = ms.MinesweeperSolver(self.settings)
 
         for _ in iterator:
-            self.one_game(seed=self.game_seeds.pop())
+            # Play game either from seeds or fields
+            if self.game_seeds is not None:
+                self.one_game(seed=self.game_seeds.pop())
+            else:
+                self.one_game(field=self.game_fields.pop())
+
         self.spent_time = time.time() - start_time
 
         # Return the overall win rate
@@ -329,18 +359,23 @@ def main():
     runs = 100
 
     # All popular minesweeper and multidimensional minesweeper presets
-    presets = (ms.GAME_BEGINNER, ms.GAME_INTERMEDIATE, ms.GAME_EXPERT,
-               ms.GAME_3D_EASY, ms.GAME_3D_MEDIUM, ms.GAME_3D_HARD,
-               ms.GAME_4D_EASY, ms.GAME_4D_MEDIUM, ms.GAME_4D_HARD,
-               ms.GAME_4D_HARDER)
+    presets = (mg.GAME_BEGINNER, mg.GAME_INTERMEDIATE, mg.GAME_EXPERT,
+               mg.GAME_3D_EASY, mg.GAME_3D_MEDIUM, mg.GAME_3D_HARD,
+               mg.GAME_4D_EASY, mg.GAME_4D_MEDIUM, mg.GAME_4D_HARD,
+               mg.GAME_4D_HARDER)
     # Only 2D (traditional) minesweeper presets
-    presets = (ms.GAME_BEGINNER, ms.GAME_INTERMEDIATE, ms.GAME_EXPERT)
+    presets = (mg.GAME_BEGINNER, mg.GAME_INTERMEDIATE, mg.GAME_EXPERT)
     # Only a small, beginner 2D board (for testing)
-    presets = (ms.GAME_BEGINNER, )
+    presets = (mg.GAME_EXPERT, )
 
     for settings in presets:
 
-        simulation = MinesweeperSim(runs, settings, seed)
+        # Run simulation from file
+        #simulation = MinesweeperSim(settings, import_file="logfile.log")
+
+        # Run simulation from a seed
+        simulation = MinesweeperSim(settings, runs, seed)
+
         print(simulation)
         simulation.run()
         simulation.print_stats()

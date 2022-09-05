@@ -5,14 +5,14 @@ minesweeper_game.py
 
 import random
 
-import minesweeper_game as ms
+import minesweeper_game as mg
 import minesweeper_classes as mc
 
 
 class MinesweeperSolver:
     ''' Methods related to solving minesweeper game. '''
 
-    def __init__(self, settings=ms.GAME_BEGINNER):
+    def __init__(self, settings=mg.GAME_BEGINNER):
         ''' Initiate the solver. Only required game settings
         '''
 
@@ -22,7 +22,7 @@ class MinesweeperSolver:
         self.total_mines = settings.mines
 
         # Initiate helper (iteration through all cells, neighbors etc)
-        self.helper = ms.MinesweeperHelper(self.shape)
+        self.helper = mg.MinesweeperHelper(self.shape)
 
         # Placeholder for the field. Will be populated by self.solve()
         self.field = None
@@ -59,7 +59,7 @@ class MinesweeperSolver:
         '''
         all_covered = []
         for cell in self.helper.iterate_over_all_cells():
-            if self.field[cell] == ms.CELL_COVERED:
+            if self.field[cell] == mg.CELL_COVERED:
                 all_covered.append(cell)
         self.covered_cells = all_covered
 
@@ -69,7 +69,7 @@ class MinesweeperSolver:
         '''
         self.remaining_mines = self.total_mines
         for cell in self.helper.iterate_over_all_cells():
-            if self.field[cell] == ms.CELL_MINE:
+            if self.field[cell] == mg.CELL_MINE:
                 self.remaining_mines -= 1
 
     def generate_groups(self):
@@ -95,10 +95,10 @@ class MinesweeperSolver:
             # Go through the neighbors
             for neighbor in self.helper.cell_surroundings(cell):
                 # Collect all covered cells
-                if self.field[neighbor] == ms.CELL_COVERED:
+                if self.field[neighbor] == mg.CELL_COVERED:
                     covered_neighbors.append(neighbor)
                 # Subtract all marked mines
-                if self.field[neighbor] == ms.CELL_MINE:
+                if self.field[neighbor] == mg.CELL_MINE:
                     active_mines -= 1
 
             # If the list of covered cells is not empty:
@@ -470,7 +470,7 @@ class MinesweeperSolver:
             # Look at neighbors of each cell
             for neighbor in self.helper.cell_surroundings(cell):
                 # If there are any mines around, there is no chance of opening
-                if self.field[neighbor] == ms.CELL_MINE:
+                if self.field[neighbor] == mg.CELL_MINE:
                     cell_info.opening_chance = 0
                     break
                 # Otherwise each mine chance decrease opening chance
@@ -562,13 +562,13 @@ def main():
     ''' Test the solver on a simple game
     '''
 
-    settings = ms.GAME_TEST
-    settings = ms.GAME_BEGINNER
+    settings = mg.GAME_TEST
+    settings = mg.GAME_BEGINNER
 
-    game = ms.MinesweeperGame(settings, seed=0.7576039219664368)
+    game = mg.MinesweeperGame(settings, seed=0.7576039219664368)
     solver = MinesweeperSolver(settings)
 
-    while game.status == ms.STATUS_ALIVE:
+    while game.status == mg.STATUS_ALIVE:
 
         safe, mines = solver.solve(game.uncovered)
         method, random_method, chance = solver.last_move_info
@@ -586,7 +586,7 @@ def main():
         game.make_a_move(safe, mines)
         print(game)
 
-    print(ms.STATUS_MESSAGES[game.status])
+    print(mg.STATUS_MESSAGES[game.status])
 
 
 if __name__ == "__main__":
