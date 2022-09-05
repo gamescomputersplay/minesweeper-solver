@@ -614,6 +614,17 @@ class MinesweeperGame:
         return safe, mines
 
 
+def log_field(field, log_file_name="field.log"):
+    '''Save the field into a log file. For debugging purposes
+    '''
+    field_str = ""
+    for j in range(field.shape[1]):
+        for i in range(field.shape[0]):
+            field_str += LEGEND[field[i, j]]
+    with open(log_file_name, "a", encoding="utf-8") as logfile:
+        logfile.write(f"{field_str}\n")
+
+
 def main():
     ''' Some tests for minesweeper sim
     '''

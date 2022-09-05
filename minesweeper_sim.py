@@ -241,6 +241,8 @@ class MinesweeperSim:
         # statistics collector object
         self.solver_stat = SolverStat()
 
+        self.solver = None
+
     def one_game(self, seed=None, verbose=False):
         ''' Playing one game.
         Verbose would print out the board for every move
@@ -248,17 +250,16 @@ class MinesweeperSim:
 
         # Start the game, using one of the seeds
         game = ms.MinesweeperGame(self.settings, seed)
-        solver = ms_solver.MinesweeperSolver(self.settings)
 
         while game.status == ms.STATUS_ALIVE:
 
-            safe, mines = solver.solve(game.uncovered)
+            safe, mines = self.solver.solve(game.uncovered)
             if verbose:
                 print(f"Player: safe={safe}, mines={mines}")
             game.make_a_move(safe, mines)
 
             # Send all the data into the statistics object
-            self.solver_stat.add_move(solver.last_move_info, safe, mines)
+            self.solver_stat.add_move(self.solver.last_move_info, safe, mines)
 
             if verbose:
                 print(game)
@@ -270,8 +271,8 @@ class MinesweeperSim:
         # Notify if deterministic method resulted in death
         # This should not happen though
         if game.status == ms.STATUS_DEAD and \
-           solver.last_move_info[0] != "Probability":
-            print(f"Warning: death by method '{solver.last_move_info[0]}'")
+           self.solver.last_move_info[0] != "Probability":
+            print(f"Warning: death by method '{self.solver.last_move_info[0]}'")
 
         if verbose:
             print(f"Result: {ms.STATUS_MESSAGES[game.status]}")
@@ -289,6 +290,8 @@ class MinesweeperSim:
 
         # Run the simulation (with timing)
         start_time = time.time()
+        self.solver = ms_solver.MinesweeperSolver(self.settings)
+
         for _ in iterator:
             self.one_game(seed=self.game_seeds.pop())
         self.spent_time = time.time() - start_time

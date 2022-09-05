@@ -369,16 +369,6 @@ class MinesweeperBot:
         run a solver for teh next move, click the cells
         '''
 
-        def log_field(field):
-            '''Save the field into a log file. For debugging purposes
-            '''
-            field_str = ""
-            for i in range(self.game_shape[0]):
-                for j in range(self.game_shape[1]):
-                    field_str += mg.LEGEND[field[i, j]]
-            with open("field.log", "a", encoding="utf-8") as logfile:
-                logfile.write(f"{field_str}\n")
-
         actually_do_clicks = False
         # Not screenshot means this is not a test,
         # we are actually playing the game
@@ -393,10 +383,10 @@ class MinesweeperBot:
 
         # Check if the game is over, obe way or another
         if self.is_dead(field):
-            log_field(field)
+            mg.log_field(field)
             return mg.STATUS_DEAD
         if not self.has_covered(field):
-            log_field(field)
+            mg.log_field(field)
             return mg.STATUS_WON
 
         # Get the solution to the current field
