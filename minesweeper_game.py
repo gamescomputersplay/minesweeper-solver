@@ -208,8 +208,13 @@ class MinesweeperGame:
     accept a move, revealed the result, etc
     '''
 
-    def __init__(self, settings=GAME_BEGINNER, seed=None):
-        ''' Initiate a new game: generate mines, calculate numbers
+    def __init__(self, settings=GAME_BEGINNER, seed=None, field_str=None):
+        ''' Initiate a new game: generate mines, calculate numbers.
+        Inputs:
+        - settings: GameSettings objects with dimensions of the game
+                    an the number of mines
+        - seed: Seed to use for generating board. None for random.
+        - field_str: pre-generated board to use. String with "*" for mines
         '''
 
         # Shape, a tuple of dimension sizes
@@ -228,9 +233,15 @@ class MinesweeperGame:
 
         self.helper = MinesweeperHelper(self.shape)
 
-        # Generate field: array of mines and numbers that player
+        # Now we initiate "field": array of mines and numbers that player
         # cannot see yet
-        self.field = self.generate_mines()
+
+        # If field_str passed in - use it
+        if field_str is not None:
+            self.field = self.import_field(field_str)
+        # Otherwise, generate the field
+        else:
+            self.field = self.generate_mines()
 
         # Populate it with numbers
         self.generate_numbers()
@@ -613,16 +624,30 @@ class MinesweeperGame:
 
         return safe, mines
 
+    def export_field(self, field=None):
+        '''Save the field into a log file, so later we will be able to import it.
+        For debugging purposes
+        '''
+        # If no field passed in - use current game
+        if field is None:
+            field = self.field
+        field_str = ""
+        for cell in self.helper.iterate_over_all_cells():
+            field_str += LEGEND[self.field[cell]]
+        return field_str
 
-def log_field(field, log_file_name="field.log"):
-    '''Save the field into a log file. For debugging purposes
-    '''
-    field_str = ""
-    for j in range(field.shape[1]):
-        for i in range(field.shape[0]):
-            field_str += LEGEND[field[i, j]]
-    with open(log_file_name, "a", encoding="utf-8") as logfile:
-        logfile.write(f"{field_str}\n")
+    def import_field(self, field_str):
+        '''Generate field from the string (that was saved by export)
+        '''
+        field = np.full(self.shape, 0)
+        string_pointer = 0
+        # Go through all cells and all characters in the field_str
+        for cell in self.helper.iterate_over_all_cells():
+            # Whenever field_str has "*" - it's a mine
+            if field_str[string_pointer] == "*":
+                field[cell] = CELL_MINE
+            string_pointer += 1
+        return field
 
 
 def main():
