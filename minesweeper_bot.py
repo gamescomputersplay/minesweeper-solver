@@ -43,7 +43,7 @@ class MinesweeperBotSettings():
         self.cell_padding = 1
 
 
-SETTINGS_MINESWEEPER_X = MinesweeperBotSettings(
+SETTINGS_MINESWEEPER_X_125 = MinesweeperBotSettings(
     field_color=[(192, 192, 192), (192, 192, 192, 255)],
     samples_files={
         "samples/msx-125-0.png": 0,
@@ -61,6 +61,25 @@ SETTINGS_MINESWEEPER_X = MinesweeperBotSettings(
         "samples/msx-125-false.png": mg.CELL_FALSE_MINE,
         }
     )
+
+SETTINGS_MINESWEEPER_X = MinesweeperBotSettings(
+    field_color=[(192, 192, 192), (192, 192, 192, 255)],
+    samples_files={
+        "samples/msx-0.png": 0,
+        "samples/msx-1.png": 1,
+        "samples/msx-2.png": 2,
+        "samples/msx-3.png": 3,
+        "samples/msx-4.png": 4,
+        "samples/msx-5.png": 5,
+        "samples/msx-6.png": 6,
+        "samples/msx-7.png": 7,
+        "samples/msx-mine.png": mg.CELL_MINE,
+        "samples/msx-flag.png": mg.CELL_MINE,
+        "samples/msx-covered.png": mg.CELL_COVERED,
+        "samples/msx-explosion.png": mg.CELL_EXPLODED_MINE,
+        }
+    )
+
 
 # SETTING_GOOGLE_MINESWEEPER.field_color = [(146, 217, 43), (155, 223, 54)]
 
@@ -372,7 +391,8 @@ class MinesweeperBot:
         def log_field(field, filename="log.log"):
             '''Save the field into a log file. For debugging purposes
             '''
-            game = mg.MinesweeperGame(self.settings)
+            game_settings = mg.GameSettings(self.game_shape, self.game_mines)
+            game = mg.MinesweeperGame(game_settings)
             field_str = game.export_field(field)
             with open(filename, "a", encoding="utf-8") as logfile:
                 logfile.write(f"{field_str}\n")
@@ -456,7 +476,7 @@ def use_bot(games_to_play=100):
 def main():
     '''Run the bot program
     '''
-    use_bot(10)
+    use_bot(100)
 
 if __name__ == "__main__":
     start = time.time()
