@@ -73,6 +73,7 @@ SETTINGS_MINESWEEPER_X = MinesweeperBotSettings(
         "samples/msx-5.png": 5,
         "samples/msx-6.png": 6,
         "samples/msx-7.png": 7,
+        "samples/msx-8.png": 8,
         "samples/msx-mine.png": mg.CELL_MINE,
         "samples/msx-flag.png": mg.CELL_MINE,
         "samples/msx-covered.png": mg.CELL_COVERED,
@@ -494,7 +495,7 @@ def use_bot(games_to_play=100):
 def main():
     '''Run the bot program
     '''
-    use_bot(20)
+    use_bot(10)
 
 if __name__ == "__main__":
     start = time.time()
