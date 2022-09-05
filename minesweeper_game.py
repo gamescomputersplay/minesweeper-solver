@@ -58,6 +58,15 @@ CELL_FALSE_MINE = -3
 # Explosion (clicked safe, but it was a mine)
 CELL_EXPLODED_MINE = -4
 
+# Characters to show for different statuses
+# 80 is the highest possible number of neighbors (in a 4d game)
+LEGEND = {**{
+    CELL_MINE: "*",
+    CELL_COVERED: " ",
+    CELL_FALSE_MINE: "X",
+    CELL_EXPLODED_MINE: "!",
+    0: "."
+}, **{i: str(i) for i in range(1, 81)}}
 
 # MinesweeperGame.status: returned by the do_move, tells the result of the move
 STATUS_ALIVE = 0
@@ -199,8 +208,13 @@ class MinesweeperGame:
     accept a move, revealed the result, etc
     '''
 
-    def __init__(self, settings=GAME_BEGINNER, seed=None):
-        ''' Initiate a new game: generate mines, calculate numbers
+    def __init__(self, settings=GAME_BEGINNER, seed=None, field_str=None):
+        ''' Initiate a new game: generate mines, calculate numbers.
+        Inputs:
+        - settings: GameSettings objects with dimensions of the game
+                    an the number of mines
+        - seed: Seed to use for generating board. None for random.
+        - field_str: pre-generated board to use. String with "*" for mines
         '''
 
         # Shape, a tuple of dimension sizes
@@ -219,9 +233,15 @@ class MinesweeperGame:
 
         self.helper = MinesweeperHelper(self.shape)
 
-        # Generate field: array of mines and numbers that player
+        # Now we initiate "field": array of mines and numbers that player
         # cannot see yet
-        self.field = self.generate_mines()
+
+        # If field_str passed in - use it
+        if field_str is not None:
+            self.field = self.import_field(field_str)
+        # Otherwise, generate the field
+        else:
+            self.field = self.generate_mines()
 
         # Populate it with numbers
         self.generate_numbers()
@@ -437,16 +457,6 @@ class MinesweeperGame:
         height = field_to_show.shape[1]
         width = field_to_show.shape[0]
 
-        # Characters to show for different statuses
-        # 80 is the highest possible number of neighbors (in a 4d game)
-        characters_to_display = {**{
-            CELL_MINE: "*",
-            CELL_COVERED: " ",
-            CELL_FALSE_MINE: "X",
-            CELL_EXPLODED_MINE: "!",
-            0: "."
-        }, **{i: str(i) for i in range(1, 81)}}
-
         # Add all data to this string
         output = ""
 
@@ -478,7 +488,7 @@ class MinesweeperGame:
                 cell_value = field_to_show[col, row]
 
                 # Display the character according to characters_to_display
-                output += characters_to_display[cell_value] + " "
+                output += LEGEND[cell_value] + " "
 
             # Right border
             output += "!\n"
@@ -614,6 +624,31 @@ class MinesweeperGame:
 
         return safe, mines
 
+    def export_field(self, field=None):
+        '''Save the field into a log file, so later we will be able to import it.
+        For debugging purposes
+        '''
+        # If no field passed in - use current game
+        if field is None:
+            field = self.field
+        field_str = ""
+        for cell in self.helper.iterate_over_all_cells():
+            field_str += LEGEND[self.field[cell]]
+        return field_str
+
+    def import_field(self, field_str):
+        '''Generate field from the string (that was saved by export)
+        '''
+        field = np.full(self.shape, 0)
+        string_pointer = 0
+        # Go through all cells and all characters in the field_str
+        for cell in self.helper.iterate_over_all_cells():
+            # Whenever field_str has "*" - it's a mine
+            if field_str[string_pointer] == "*":
+                field[cell] = CELL_MINE
+            string_pointer += 1
+        return field
+
 
 def main():
     ''' Some tests for minesweeper sim
@@ -625,7 +660,7 @@ def main():
     game = MinesweeperGame(settings=GAME_TEST, seed=seed)
 
     # For debugging: check out the field
-    print(game.field2str(game.field))
+    # print(game.field2str(game.field))
 
     # Keep making moves, while alive
     while game.status == STATUS_ALIVE:

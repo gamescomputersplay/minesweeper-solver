@@ -130,3 +130,8 @@ dmypy.json
 
 # VSC
 .vscode
+
+# I generate a few .png for testing, ignore them
+*.png
+# But those in samples are needed
+!/samples/*.png
