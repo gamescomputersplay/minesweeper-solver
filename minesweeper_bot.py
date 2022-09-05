@@ -167,9 +167,12 @@ class MinesweeperBot:
                         left, top, right, bottom = find_square(i, j)
 
                         # If the square is found and it is large enough,
+                        # and it is "square-ish" enough
                         # store 4 coordinates in "found"
                         if left and \
-                           right - left > self.settings.minimum_cell_size:
+                           right - left > self.settings.minimum_cell_size and \
+                           (bottom - top) > 0 and \
+                           1.1 > (right-left) / (bottom - top) > 0.9:
                             found.append((left, top, right, bottom))
 
                             # Fill it with black so it would not be found again
