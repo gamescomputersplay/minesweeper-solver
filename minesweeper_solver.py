@@ -38,7 +38,7 @@ class MinesweeperSolver:
 
         # Placeholder for clusters (main element of CSP method)
         self.all_clusters = \
-            mc.AllClusters(self.covered_cells, self.remaining_mines)
+            mc.AllClusters(self.covered_cells, self.remaining_mines, self.helper)
 
         # Placeholder for mine probability data
         # {cell: probability_of_it_being_a_mine}
@@ -112,7 +112,7 @@ class MinesweeperSolver:
         '''
         # Reset clusters
         self.all_clusters = \
-            mc.AllClusters(self.covered_cells, self.remaining_mines)
+            mc.AllClusters(self.covered_cells, self.remaining_mines, self.helper)
         # Reset all "belong to cluster" information from the groups
         self.groups.reset_clusters()
 
@@ -543,7 +543,7 @@ class MinesweeperSolver:
         self.calculate_opening_chances()
 
         # Pick a cell that is least likely a mine
-        lucky_cells = self.probability.pick_lowest_probability()
+        lucky_cells = self.probability.pick_lowest_probability(self.all_clusters)
 
         if lucky_cells:
             lucky_cell = self.pick_a_random_cell(lucky_cells)
