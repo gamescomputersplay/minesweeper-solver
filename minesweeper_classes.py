@@ -2,6 +2,7 @@
 '''
 
 import math
+import itertools
 from dataclasses import dataclass
 
 
@@ -60,7 +61,7 @@ class MineGroup:
 
 
 class AllGroups:
-    ''' Functions to handle a group of MineGroup object:
+    ''' Functions to handle a group of MineGroup object (groups and subgroups):
     deduplicate them, generate subgroups ("at least" and "no more than")
     '''
 
@@ -69,6 +70,10 @@ class AllGroups:
         self.hashes = set()
         # List of MineGroups
         self.mine_groups = []
+
+        # Count of regular (exact) groups.
+        # Will be used to save time not iterating through subgroups.
+        self.count_groups = None
 
     def reset(self):
         ''' Clear the data
@@ -103,6 +108,16 @@ class AllGroups:
         ''' For iterator, use the list of groups
         '''
         return iter(self.mine_groups)
+
+    def exact_groups(self):
+        ''' For iterator, use the list of groups
+        '''
+        return itertools.islice(self.mine_groups, self.count_groups)
+
+    def subgroups(self):
+        ''' For iterator, use the list of groups
+        '''
+        return itertools.islice(self.mine_groups, self.count_groups, len(self.mine_groups))
 
     def generate_subgroup_at_least(self):
         ''' Generate "group has at least X mines" subgroup. Add them to groups.

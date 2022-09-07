@@ -141,11 +141,10 @@ class MinesweeperSolver:
             while True:
 
                 # Look through all groups
-                for group in self.groups:
+                for group in self.groups.exact_groups():
                     # If it overlaps with this group and not part of any
                     # other cluster - add this group
-                    if group.group_type == "exactly" and \
-                       group.belong_to_cluster is None and \
+                    if group.belong_to_cluster is None and \
                        new_cluster.overlap(group):
                         new_cluster.add(group)
                         break
@@ -174,11 +173,7 @@ class MinesweeperSolver:
                 # unaccounted cells
                 best_count = None
                 best_group = None
-                for group in self.groups:
-
-                    # We only need "exactly" groups
-                    if group.group_type != "exactly":
-                        continue
+                for group in self.groups.exact_groups():
 
                     # If group overlaps with what we have so far -
                     # we don't need such group
@@ -329,6 +324,9 @@ class MinesweeperSolver:
         ''' Subgroups method. Based on breaking groups down "at least" and
         "no more than" subgroups and cross checking them with groups.
         '''
+        # Note how many groups we have
+        self.groups.count_groups = len(self.groups.mine_groups)
+
         # Generate subgroups
         # Funny thing, it actually works just as well with only one
         # (either) of these two generated
@@ -341,12 +339,13 @@ class MinesweeperSolver:
         # cross-check all the groups, but this time
         # we only will check "at least" and "no more than"
         # subgroups
-        for group_a in self.groups:
-            for group_b in self.groups:
+        # Group A are all subgroups (at least, no more)
+        for group_a in self.groups.subgroups():
+            # Group B are all groups (exactly)
+            for group_b in self.groups.exact_groups():
 
                 # Only compare subgroups "at least" to groups.
-                if group_a.group_type == "at least" and \
-                   group_b.group_type == "exactly":
+                if group_a.group_type == "at least":
 
                     # Similar to "groups" method: if mines are the same,
                     # the difference is safe
@@ -355,8 +354,7 @@ class MinesweeperSolver:
                     safe.extend(self.deduce_safe(group_a, group_b))
 
                 # Only compare subgroups "no more than" to groups.
-                if group_a.group_type == "no more than" and \
-                   group_b.group_type == "exactly":
+                if group_a.group_type == "no more than":
 
                     # Similar to "groups" method: if mines are the same,
                     # the difference is safe
@@ -420,10 +418,7 @@ class MinesweeperSolver:
             Each cell's probability is: max(group_mines / group_cells, ...),
             for all cells it is in.
             '''
-            for group in self.groups:
-                # We only need "exactly" type of groups
-                if group.group_type != "exactly":
-                    continue
+            for group in self.groups.exact_groups():
 
                 # Probability of each mine in teh group
                 group_probability = group.mines / len(group.cells)
