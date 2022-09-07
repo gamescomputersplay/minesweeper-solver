@@ -37,8 +37,8 @@ class MinesweeperSolver:
         self.groups = mc.AllGroups()
 
         # Placeholder for clusters (main element of CSP method)
-        self.all_clusters = \
-            mc.AllClusters(self.covered_cells, self.remaining_mines, self.helper)
+        self.all_clusters = mc.AllClusters(self.covered_cells,
+                                           self.remaining_mines, self.helper)
 
         # Placeholder for mine probability data
         # {cell: probability_of_it_being_a_mine}
@@ -111,8 +111,8 @@ class MinesweeperSolver:
         '''Populate self.clusters with cell clusters
         '''
         # Reset clusters
-        self.all_clusters = \
-            mc.AllClusters(self.covered_cells, self.remaining_mines, self.helper)
+        self.all_clusters = mc.AllClusters(self.covered_cells,
+                                           self.remaining_mines, self.helper)
         # Reset all "belong to cluster" information from the groups
         self.groups.reset_clusters()
 
@@ -542,18 +542,21 @@ class MinesweeperSolver:
         # Calculate opening chances
         self.calculate_opening_chances()
 
-        # Pick a cell that is least likely a mine
-        lucky_cells = self.probability.pick_lowest_probability(self.all_clusters)
+        # Get cells that is least likely a mine
+        lucky_cells = \
+            self.probability.pick_lowest_probability(self.all_clusters)
 
         if lucky_cells:
+            # There may be more than one such cells, pick a random one
             lucky_cell = self.pick_a_random_cell(lucky_cells)
+            # Store information about expected chance of mine and how
+            # this chance was calculated
             self.last_move_info = ("Probability",
                                    self.probability[lucky_cell].source,
                                    self.probability[lucky_cell].mine_chance)
             return [lucky_cell, ], None
 
-        # Until the count method implemented, there is a chance of
-        # "exclave" cells. This is a catch-all for that
+        # This should not happen, but here's a catch-all if it does
         self.last_move_info = ("Last Resort", None)
         return [self.pick_a_random_cell(self.covered_cells), ], None
 

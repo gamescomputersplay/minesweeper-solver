@@ -223,7 +223,8 @@ class MinesweeperSim:
     ''' Methods to handle minesweeper game simulation
     '''
 
-    def __init__(self, settings=mg.GAME_EXPERT, runs=100, seed=None, import_file=None):
+    def __init__(self, settings=mg.GAME_EXPERT,
+                 runs=100, seed=None, import_file=None):
 
         def load_import_file(import_file):
             ''' Read data from the file with saved games
@@ -237,9 +238,10 @@ class MinesweeperSim:
         # Game settings (field dimensions, mine count)
         self.settings = settings
 
-        # If import file passed: load games from it, set the runs to the length of the file
+        # If import file passed: load games from it,
+        # set the runs to the length of the file
         if import_file is not None:
-            self.game_fields  = load_import_file(import_file)
+            self.game_fields = load_import_file(import_file)
             self.runs = len(self.game_fields)
             self.game_seeds = None
 
@@ -294,10 +296,11 @@ class MinesweeperSim:
         self.solver_stat.add_game(game.status)
 
         # Notify if deterministic method resulted in death
-        # This should not happen though
+        # Should not happen, if it does, there is an error in that method
         if game.status == mg.STATUS_DEAD and \
            self.solver.last_move_info[0] != "Probability":
-            print(f"Warning: death by method '{self.solver.last_move_info[0]}'")
+            print("Warning: death by deterministic method",
+                  self.solver.last_move_info[0])
 
         if verbose:
             print(f"Result: {mg.STATUS_MESSAGES[game.status]}")
@@ -371,7 +374,7 @@ def main():
     for settings in presets:
 
         # Run simulation from file
-        #simulation = MinesweeperSim(settings, import_file="logfile.log")
+        # simulation = MinesweeperSim(settings, import_file="logfile.log")
 
         # Run simulation from a seed
         simulation = MinesweeperSim(settings, runs, seed)
