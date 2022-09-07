@@ -368,7 +368,7 @@ def main():
                mg.GAME_4D_HARDER)
     # Only 2D (traditional) minesweeper presets
     presets = (mg.GAME_BEGINNER, mg.GAME_INTERMEDIATE, mg.GAME_EXPERT)
-    # Only a small, beginner 2D board (for testing)
+    # Only an expert 2D board
     presets = (mg.GAME_EXPERT, )
 
     for settings in presets:

@@ -12,7 +12,7 @@ import minesweeper_classes as mc
 class MinesweeperSolver:
     ''' Methods related to solving minesweeper game. '''
 
-    def __init__(self, settings=mg.GAME_BEGINNER):
+    def __init__(self, settings=mg.GAME_BEGINNER, helper=None):
         ''' Initiate the solver. Only required game settings
         '''
 
@@ -21,8 +21,14 @@ class MinesweeperSolver:
         # N umber of total mines in the game
         self.total_mines = settings.mines
 
+        # If there is no helper passed in,
         # Initiate helper (iteration through all cells, neighbors etc)
-        self.helper = mg.MinesweeperHelper(self.shape)
+        # Helper is reused by future instances to save time
+        # (initiating helper is a rather costly operation)
+        if helper is None:
+            self.helper = mg.MinesweeperHelper(self.shape)
+        else:
+            self.helper = helper
 
         # Placeholder for the field. Will be populated by self.solve()
         self.field = None
@@ -53,6 +59,15 @@ class MinesweeperSolver:
         # ("method name", probability). Probability make sense if it
         # was "Random"
         self.last_move_info = None
+
+    def copy(self):
+        '''Create a copy of solver object.
+        Reuse settings and helper from the original one
+        '''
+        settings = mg.GameSettings(self.shape, self.total_mines)
+        new_solver = MinesweeperSolver(settings, helper=self.helper)
+        # Do we want to copy cluster history maybe?
+        return new_solver
 
     def generate_all_covered(self):
         ''' Return the list of all covered cells
@@ -487,14 +502,14 @@ class MinesweeperSolver:
         '''
         return random.choice(cells)
 
-    def solve(self, field, use_probability=True):
+    def solve(self, field, next_moves=1):
         ''' Main solving function.
         Go through various solving methods and return safe and mines lists
         as long as any of the methods return results
         In:
         - the field (what has been uncovered so far).
-        - use_probability: True for regular use. False for using only
-        deterministic methods: this  mode is to estimate worth of next moves
+        - next_moves: remaining levels of recursion to look for mine chances
+          in the 2nd, 3rd and so on moves
         Out:
         - list of safe cells
         - list of mines
@@ -532,11 +547,6 @@ class MinesweeperSolver:
                 self.last_move_info = (method_name, None, None)
                 return safe, mines
 
-        # Deterministic methods are over. If we  are not supposed to use
-        # probability-based ones, our job here is done.
-        if not use_probability:
-            return safe, mines
-
         # Calculate mine probability using various methods
         self.calculate_probabilities()
         # Calculate opening chances
@@ -544,7 +554,7 @@ class MinesweeperSolver:
 
         # Get cells that is least likely a mine
         lucky_cells = \
-            self.probability.pick_lowest_probability(self.all_clusters)
+            self.probability.get_luckiest(self.all_clusters, next_moves, self)
 
         if lucky_cells:
             # There may be more than one such cells, pick a random one

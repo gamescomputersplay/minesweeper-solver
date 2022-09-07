@@ -263,7 +263,7 @@ class GroupCluster:
         if len(self.cells_set) / len(self.groups) > 12 or \
            len(self.cells_set) > 50 or \
            max(math.comb(len(group.cells), group.mines)
-                for group in self.groups) > 1001:
+                for group in self.groups if group.mines > 0) > 1001:
             return
 
         # We need to fix the order of cells, for that we populate self.cells
@@ -687,15 +687,13 @@ class CellProbability:
     source: str
     # Chance it would be an opening (no mines in surrounding cells)
     opening_chance: float = 0
-    # Number of solved cells in the next round, if this cell is uncovered
-    next_sure_clicks: int = 0
 
 
 class AllProbabilities(dict):
     '''Class to work with probability-based information about cells
     '''
 
-    def pick_lowest_probability(self, clusters):
+    def get_luckiest(self, clusters, next_moves, original_solver):
         ''' Pick and return the cell(s) with the lowest mine probability,
         and, if several, with highest opening probability.
         '''
@@ -706,37 +704,82 @@ class AllProbabilities(dict):
         # Sort by 1. mine chance 2. opening chance. Put the best at the end
         cells.sort(key=lambda x: (x[1], -x[2]))
 
-        # New logic, recursively check what will be the mine chance for
+        # End of recursion, don't go deeper
+        # Just return all cells with best mine and open chances
+        if next_moves == 0:
+
+            # This is the best chances
+            _, best_mine_chance, best_opening_chance = cells[0]
+
+            # Pick cells with the best probability and opening chances
+            cells_best_chances = []
+            for cell, mine_chance, opening_chance in cells:
+                if mine_chance == best_mine_chance and \
+                opening_chance == best_opening_chance:
+                    cells_best_chances.append(cell)
+
+            # Return cells with lowest mine chance and highest open chance.
+            # Later we'll add a logic to look playing "Future" boards to determine
+            # survivability over 2 and more moves. Not right now though.
+            return cells_best_chances
+
+
+        # Keep recursion going: check what will be the mine chance for
         # the next move (Currently being implemented)
 
         # Pick 5 or fewer cells to look into 2nd move chances
         cells_for_recursion = cells[:5]
 
+        # Make a copy of the solver (so not to regenerate helpers)
+        new_solver = original_solver.copy()
+
         # Calculate probable number of mines in those cells
         # print(f"Best chances cells: {len(cells_for_recursion)}")
-        for cell, _chance, _opening in cells_for_recursion:
+        cells_with_next_move = []
+        for cell, chance, opening in cells_for_recursion:
             # print (f"- Cell: {cell}, Chance: {chance}, Opening: {opening}")
-            _probable_mines = clusters.get_mines_chances(cell)
-            # print (f"-- Probable mines: {probable_mines}")
+            probable_next_values = clusters.get_mines_chances(cell)
+            # print (f"-- Probable mines: {probable_next_values}")
 
-        # Old logic: return all cells with best mine and open chances
+            # Now go through possible values for that cell
+            overall_survival = 0
+            for next_cell_value, next_cell_chance in probable_next_values.items():
 
-        # This is the best chances
-        _, best_mine_chance, best_opening_chance = cells[0]
-        cells_best_chances = []
+                # Copy of the current field
+                new_field = original_solver.field.copy()
 
-        # Pick cells with the best probability and opening chances
-        for cell, mine_chance, opening_chance in cells:
-            if mine_chance == best_mine_chance and \
-               opening_chance == best_opening_chance:
-                cells_best_chances.append(cell)
+                # Replace the cell in question with a probably future value
+                new_field[cell] = next_cell_value
 
-        # Return cells with lowest mine chance and highest open chance.
-        # Later we'll add a logic to look playing "Future" boards to determine
-        # survivability over 2 and more moves. Not right now though.
-        return cells_best_chances
+                # Run the solver, use the updated field and decreased recursion value
+                new_solver.solve(new_field, next_moves - 1)
 
-        # return [cells_for_recursion[0][0]]
+                if new_solver.last_move_info[0] == "Probability":
+                    next_mine_chance = new_solver.last_move_info[2]
+                else:
+                    next_mine_chance = 0
+
+                next_survival = (1 - chance) * (1 - next_mine_chance)
+                overall_survival += next_survival * next_cell_chance
+
+                # print(f"--- Result: ({next_cell_value}), Survival: {next_survival}")
+            # print (f"-- Cell Survival: {overall_survival}")
+            cells_with_next_move.append((cell, chance, opening, overall_survival))
+
+        # Sort it by 2nd round survival and opening chance
+        cells_with_next_move.sort(key=lambda x: (-x[3], x[1], -x[2]))
+
+        # This is the best 2-step survival
+        _, _, best_opening, best_survival = cells_with_next_move[0]
+
+        # Pick cells with the best survival and opening chances
+        cells_best_survival = []
+        for cell, chance, opening, survival in cells_with_next_move:
+            if survival == best_survival and \
+            opening == best_opening:
+                cells_best_survival.append(cell)
+
+        return cells_best_survival
 
 
 def main():
