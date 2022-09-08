@@ -21,6 +21,9 @@ SHOW_SEED = False
 SHOW_METHODS_STAT = True
 SHOW_PROBABILITY_STAT = True
 
+# How many moves ahead analyze (0 - only the current position)
+LOOK_NEXT_MOVES = 1
+
 
 class SolverStat:
     ''' Class to collect and display statistics about methods, used by solver
@@ -281,7 +284,8 @@ class MinesweeperSim:
 
         while game.status == mg.STATUS_ALIVE:
 
-            safe, mines = self.solver.solve(game.uncovered)
+            safe, mines = self.solver.solve(game.uncovered,
+                                            next_moves=LOOK_NEXT_MOVES)
             if verbose:
                 print(f"Player: safe={safe}, mines={mines}")
             game.make_a_move(safe, mines)
@@ -326,7 +330,7 @@ class MinesweeperSim:
             if self.game_seeds is not None:
 
                 # Seed to start the game with
-                seed=self.game_seeds.pop()
+                seed = self.game_seeds.pop()
                 if SHOW_SEED:
                     print(f"Seed: {seed}")
 

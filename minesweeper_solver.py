@@ -66,7 +66,6 @@ class MinesweeperSolver:
         '''
         settings = mg.GameSettings(self.shape, self.total_mines)
         new_solver = MinesweeperSolver(settings, helper=self.helper)
-        # Do we want to copy cluster history maybe?
         return new_solver
 
     def generate_all_covered(self):
@@ -574,7 +573,7 @@ def main():
     settings = mg.GAME_BEGINNER
     settings = mg.GAME_EXPERT
 
-    game = mg.MinesweeperGame(settings, seed=0.3631930745481745)
+    game = mg.MinesweeperGame(settings, seed=0.1007012080683658)
     solver = MinesweeperSolver(settings)
 
     while game.status == mg.STATUS_ALIVE:

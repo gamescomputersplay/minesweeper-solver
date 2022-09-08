@@ -723,17 +723,12 @@ class AllProbabilities(dict):
         ''' Pick and return the cell(s) with the lowest mine probability,
         and, if several, with highest opening probability.
         '''
-        # Copy the info into a list, so we can just sort it
-        cells = [(cell, cell_info.mine_chance, cell_info.opening_chance)
-                 for cell, cell_info in self.items()]
 
-        # Sort by 1. mine chance 2. opening chance. Put the best at the end
-        cells.sort(key=lambda x: (x[1], -x[2]))
-
-        # End of recursion, don't go deeper
-        # Just return all cells with best mine and open chances
-        if next_moves == 0:
-
+        def simple_best_probability():
+            ''' Calculating probability without looking into next moves:
+            just pick lowest mine chance with highest opening chance.
+            Return a list if several.
+            '''
             # This is the best chances
             _, best_mine_chance, best_opening_chance = cells[0]
 
@@ -749,22 +744,10 @@ class AllProbabilities(dict):
             # survivability over 2 and more moves. Not right now though.
             return cells_best_chances
 
-
-        # Keep recursion going: check what will be the mine chance for
-        # the next move (Currently being implemented)
-
-        # Pick 5 or fewer cells to look into 2nd move chances
-        cells_for_recursion = cells[:5]
-
-        # Make a copy of the solver (so not to regenerate helpers)
-        new_solver = original_solver.copy()
-
-        # Calculate probable number of mines in those cells
-        # print(f"Best chances cells: {len(cells_for_recursion)}")
-        cells_with_next_move = []
-        for cell, chance, opening in cells_for_recursion:
-            # print (f"- Cell: {cell}, Chance: {chance}, Opening: {opening}")
-
+        def calculate_next_move_survival(cell):
+            ''' Calculate survival probability after the NEXT move,
+            if we chose to click cell
+            '''
             probable_new_mines = clusters.get_mines_chances(cell)
             # print (f"-- Probable mines: {probable_new_mines}")
 
@@ -791,11 +774,44 @@ class AllProbabilities(dict):
                     next_mine_chance = 0
 
                 next_survival = (1 - chance) * (1 - next_mine_chance)
+                # print(f"--- Result: ({new_mines_count}), Survival: {next_survival}")
                 overall_survival += next_survival * new_mines_chance
 
-                # print(f"--- Result: ({new_mines_count}), Survival: {next_survival}")
+            return overall_survival
+
+        # Copy the info into a list, so we can just sort it
+        cells = [(cell, cell_info.mine_chance, cell_info.opening_chance)
+                 for cell, cell_info in self.items()]
+
+        # Sort by 1. mine chance 2. opening chance. Put the best at the end
+        cells.sort(key=lambda x: (x[1], -x[2]))
+
+        # End of recursion, don't go deeper
+        # Just return all cells with best mine and open chances
+        if next_moves == 0:
+
+            return simple_best_probability()
+
+
+        # Keep recursion going: check what will be the mine chance for
+        # the next move (Currently being implemented)
+
+        # Pick 5 or fewer cells to look into 2nd move chances
+        cells_for_recursion = cells[:5]
+
+        # Make a copy of the solver (so not to regenerate helpers)
+        new_solver = original_solver.copy()
+
+        # Calculate probable number of mines in those cells
+        #print(f"Best chances cells: {len(cells_for_recursion)}")
+        cells_with_next_move = []
+        for cell, chance, opening in cells_for_recursion:
+
+            #print (f"- Cell: {cell}, Chance: {chance}, Opening: {opening}")
+            next_move_survival = calculate_next_move_survival(cell)
+
             # print (f"-- Cell Survival: {overall_survival}")
-            cells_with_next_move.append((cell, chance, opening, overall_survival))
+            cells_with_next_move.append((cell, chance, opening, next_move_survival))
 
         # Sort it by 2nd round survival and opening chance
         cells_with_next_move.sort(key=lambda x: (-x[3], x[1], -x[2]))
