@@ -572,8 +572,9 @@ def main():
 
     settings = mg.GAME_TEST
     settings = mg.GAME_BEGINNER
+    settings = mg.GAME_EXPERT
 
-    game = mg.MinesweeperGame(settings, seed=0.7576039219664368)
+    game = mg.MinesweeperGame(settings, seed=0.3631930745481745)
     solver = MinesweeperSolver(settings)
 
     while game.status == mg.STATUS_ALIVE:

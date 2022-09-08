@@ -5,6 +5,7 @@ import math
 import itertools
 from dataclasses import dataclass
 
+import minesweeper_game as mg
 
 class MineGroup:
     ''' A MineGroup is a set of cells that are known
@@ -708,6 +709,16 @@ class AllProbabilities(dict):
     '''Class to work with probability-based information about cells
     '''
 
+    @staticmethod
+    def current_found_mines(helper, field, cell):
+        ''' Return already known mines around "cell" in the "field
+        '''
+        mine_count = 0
+        for neighbor in helper.cell_surroundings(cell):
+            if field[neighbor] == mg.CELL_MINE:
+                mine_count += 1
+        return mine_count
+
     def get_luckiest(self, clusters, next_moves, original_solver):
         ''' Pick and return the cell(s) with the lowest mine probability,
         and, if several, with highest opening probability.
@@ -753,18 +764,23 @@ class AllProbabilities(dict):
         cells_with_next_move = []
         for cell, chance, opening in cells_for_recursion:
             # print (f"- Cell: {cell}, Chance: {chance}, Opening: {opening}")
-            probable_next_values = clusters.get_mines_chances(cell)
-            # print (f"-- Probable mines: {probable_next_values}")
+
+            probable_new_mines = clusters.get_mines_chances(cell)
+            # print (f"-- Probable mines: {probable_new_mines}")
 
             # Now go through possible values for that cell
             overall_survival = 0
-            for next_cell_value, next_cell_chance in probable_next_values.items():
-
+            for new_mines_count, new_mines_chance in probable_new_mines.items():
+                # print(f"--- Start doing option: ({new_mines_count})")
                 # Copy of the current field
                 new_field = original_solver.field.copy()
 
+                # See how many mines are already there around that cell
+                current_mines = self.current_found_mines(new_solver.helper, new_field, cell)
+
+                # Add possible new mines and existing mines.
                 # Replace the cell in question with a probably future value
-                new_field[cell] = next_cell_value
+                new_field[cell] = new_mines_count + current_mines
 
                 # Run the solver, use the updated field and decreased recursion value
                 new_solver.solve(new_field, next_moves - 1)
@@ -775,9 +791,9 @@ class AllProbabilities(dict):
                     next_mine_chance = 0
 
                 next_survival = (1 - chance) * (1 - next_mine_chance)
-                overall_survival += next_survival * next_cell_chance
+                overall_survival += next_survival * new_mines_chance
 
-                # print(f"--- Result: ({next_cell_value}), Survival: {next_survival}")
+                # print(f"--- Result: ({new_mines_count}), Survival: {next_survival}")
             # print (f"-- Cell Survival: {overall_survival}")
             cells_with_next_move.append((cell, chance, opening, overall_survival))
 

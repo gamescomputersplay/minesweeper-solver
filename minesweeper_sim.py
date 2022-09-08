@@ -17,6 +17,7 @@ import minesweeper_solver as ms
 # Whether to display progress bar for a simulation
 # May have issues on some IDEs
 USE_PROGRESS_BAR = True
+SHOW_SEED = False
 SHOW_METHODS_STAT = True
 SHOW_PROBABILITY_STAT = True
 
@@ -323,7 +324,13 @@ class MinesweeperSim:
         for _ in iterator:
             # Play game either from seeds or fields
             if self.game_seeds is not None:
-                self.one_game(seed=self.game_seeds.pop())
+
+                # Seed to start the game with
+                seed=self.game_seeds.pop()
+                if SHOW_SEED:
+                    print(f"Seed: {seed}")
+
+                self.one_game(seed=seed)
             else:
                 self.one_game(field=self.game_fields.pop())
 
