@@ -7,10 +7,11 @@ from dataclasses import dataclass
 
 import minesweeper_game as mg
 
+
 class MineGroup:
     ''' A MineGroup is a set of cells that are known
     to have a certain number of mines.
-    For example "cell1, cell2, cell3 have exactly 1 mine" or
+    For example "cell1, cell2, cell3 have exactly 2 mine" or
     "cell4, cell5 have at least 1 mine".
     This is a basic element for Groups and Subgroups solving methods.
     '''
@@ -28,17 +29,18 @@ class MineGroup:
         # Calculate hash (for deduplication)
         self.hash = self.calculate_hash()
 
-        # Placeholder for cluster information
-        # (each group can belong to only one cluster)
+        # Placeholder for cluster belonging info
+        # Mine group is a building block for group clusters.
+        # belongs_to_cluster will have the cluster this group belongs to
         self.belongs_to_cluster = None
 
     def is_all_safe(self):
-        ''' If group has 0 mines, it is safe
+        ''' If group has 0 mines, all its cells are safe
         '''
         return self.mines == 0
 
     def is_all_mines(self):
-        ''' If group has as many cells as mines - they are all mines
+        ''' If group has as many cells as mines - all cells are mines
         '''
         return len(self.cells) == self.mines
 
@@ -63,24 +65,30 @@ class MineGroup:
 
 class AllGroups:
     ''' Functions to handle a group of MineGroup object (groups and subgroups):
-    deduplicate them, generate subgroups ("at least" and "no more than")
+    deduplicate them, generate subgroups ("at least" and "no more than") etc
     '''
 
     def __init__(self):
-        # Hashes for deduplication
+        # Hashes of current groups. For deduplication
         self.hashes = set()
         # List of MineGroups
         self.mine_groups = []
 
-        # Count of regular (exact) groups.
-        # Will be used to save time not iterating through subgroups.
+        # self.mine_groups will be holding both groups ("exactly") and
+        # subgroups ("at least", "no more than") - it is easier to generate
+        # subgroups this way.
+        # self.count_groups is a count of regular ("exactly") groups.
+        # Used to save time iterating only through groups or subgroups.
         self.count_groups = None
 
     def reset(self):
-        ''' Clear the data
+        ''' Clear the data of the groups
         '''
         self.hashes = set()
         self.mine_groups = []
+        # For some reason result is 0.1% better if I don't reset count_groups
+        # It does not make sene to me, I can't find why. But so be it.
+        # self.count_groups = None
 
     def reset_clusters(self):
         ''' Clear "belong to cluster" for each group.
@@ -89,7 +97,7 @@ class AllGroups:
             group.belong_to_cluster = None
 
     def next_non_clustered_groups(self):
-        ''' Return first found group, that is not a part of a cluster
+        ''' Return a group, that is not a part of any cluster
         '''
         for group in self.mine_groups:
             if group.belong_to_cluster is None and \
@@ -97,28 +105,29 @@ class AllGroups:
                 return group
         return None
 
-    def add(self, new_group):
-        ''' Check if if have this group already.
-        If not, add to the list
+    def add_group(self, new_group):
+        ''' Check if this group has been added already.
+        If not, add to the list.
         '''
         if new_group.hash not in self.hashes:
             self.mine_groups.append(new_group)
             self.hashes.add(new_group.hash)
 
     def __iter__(self):
-        ''' For iterator, use the list of groups
+        ''' Iterator for the groups
         '''
         return iter(self.mine_groups)
 
     def exact_groups(self):
-        ''' For iterator, use the list of groups
+        ''' Iterator, but only "exactly" groups
         '''
         return itertools.islice(self.mine_groups, self.count_groups)
 
     def subgroups(self):
-        ''' For iterator, use the list of groups
+        ''' Iterator, but only subgroups ("at least", "no more than")
         '''
-        return itertools.islice(self.mine_groups, self.count_groups, len(self.mine_groups))
+        return itertools.islice(self.mine_groups,
+                                self.count_groups, len(self.mine_groups))
 
     def generate_subgroup_at_least(self):
         ''' Generate "group has at least X mines" subgroup. Add them to groups.
@@ -144,7 +153,7 @@ class AllGroups:
                                              group.mines - 1, "at least")
                     # They will be added to the end of the list, so they
                     # in turn will be broken down, if needed
-                    self.add(new_subgroup)
+                    self.add_group(new_subgroup)
 
     def generate_subgroup_no_more_than(self):
         ''' Generate a second type of subgroups: "no more than", also add
@@ -165,7 +174,7 @@ class AllGroups:
                 for cell in group.cells:
                     new_subgroup = MineGroup(group.cells.difference({cell}),
                                              group.mines, "no more than")
-                    self.add(new_subgroup)
+                    self.add_group(new_subgroup)
 
     def __str__(self):
         ''' Some info about the groups (for debugging)
@@ -174,23 +183,25 @@ class AllGroups:
 
 
 class GroupCluster:
-    ''' CellCluster is a group of cells connected together by an overlapping
-    list of groups. In other words mine/safe in any of the cell, can
-    potentially trigger safe/mine in any other cell of the cluster.
-    Is a basic class for CSP (constraint satisfaction problem) method
+    ''' GroupCluster are several MineGroups connected together. All groups
+    overlap at least with one other groups o  mine/safe in any of the cell
+    can potentially trigger safe/mine in any other cell of the cluster.
+    Is a basic element for CSP method
     '''
 
     def __init__(self, group=None):
-        # List of cells in the cluster
+        # Cells in the cluster (as a set)
         self.cells_set = set()
         # List if groups in the cluster
         self.groups = []
 
         # Initiate by adding the first group
         if group is not None:
-            self.add(group)
+            self.add_group(group)
 
-        # Placeholder for a list of set (we need them in a fixed order)
+        # Placeholder for a list of cells (same as self.cells_set, but list).
+        # We use both set and list because set is better for finding overlap
+        # and list is needed to solve cluster.
         self.cells = []
 
         # Placeholder for the solutions of this CSP
@@ -208,7 +219,7 @@ class GroupCluster:
         # Dict of possible mine counts {mines: mine_count, ...}
         self.probable_mines = {}
 
-    def add(self, group):
+    def add_group(self, group):
         ''' Adding group to a cluster (assume they overlap).
         Add group's cells to the set of cells
         Also, mark the group as belonging to this cluster
@@ -227,9 +238,8 @@ class GroupCluster:
 
     @staticmethod
     def all_mines_positions(cells_count, mines_to_set):
-        ''' Generate all permutations for "Choose k from n",
-        which is equivalent to all possible ways mines are
-        located in the cells.
+        ''' Generate all permutations for "mines_to_set" mines to be in
+        "cells_count" cells.
         Result is a list of tuples like (False, False, True, False),
         indicating if the item was chosen (if there is a mine in the cell).
         For example, for generate_mines_permutations(2, 1) the output is:
@@ -545,8 +555,8 @@ class AllClusters:
                  cluster.solutions, cluster.solution_weights)
 
     def calculate_leftovers(self):
-        '''Based on count and probabilities of mines in cluster, calculate
-        mines and probabilities in cells that don't belong to any clusters.
+        '''Based on clusters, calculate mines and probabilities in cells
+        that don't belong to any clusters (leftovers).
         '''
         # Rarely, there are no clusters (when covered area is walled off
         # by mines, for example, like last 8)
@@ -618,9 +628,9 @@ class AllClusters:
         # And this is the probability of a mine in those cells
         self.leftover_mine_chance = leftover_mines / len(self.leftover_cells)
 
-    def mines_in_leftover_part(self, part_size):
-        ''' Calculate mine chances in the part of size "part_size"
-        of the leftover cells .
+    def mines_in_leftover_part(self, cell_count):
+        ''' If we take several cells (cell_count) in leftover area.
+        Calculate mine counts and chances for those cells.
         '''
         overall_mine_chances = {}
 
@@ -632,14 +642,17 @@ class AllClusters:
             if len(self.leftover_cells) < all_leftover_mines:
                 continue
 
+            # Number of mines is limited by either number of cells
+            # of total ines in the leftovers
+            max_possible_mines = min(cell_count, all_leftover_mines) + 1
             # Then, for all possible mine counts in the part
-            for mines_in_part in range(min(part_size, all_leftover_mines) + 1):
+            for mines_in_part in range(max_possible_mines):
                 # Chance that there will be that many mines
                 # Comb of mines in part * comb of mines in remaining part /
                 # total combinations in leftover
                 chance_in_part = \
-                    math.comb(part_size, mines_in_part) * \
-                    math.comb(len(self.leftover_cells) - part_size,
+                    math.comb(cell_count, mines_in_part) * \
+                    math.comb(len(self.leftover_cells) - cell_count,
                               all_leftover_mines - mines_in_part) / \
                     math.comb(len(self.leftover_cells), all_leftover_mines)
 
@@ -653,8 +666,9 @@ class AllClusters:
         return overall_mine_chances
 
     def get_mines_chances(self, cell):
-        ''' Calculate chances of mine count for this particular cell
+        ''' Calculate mine counts and their chances for teh cell "cell"
         '''
+
         # Get the list of neighbors for this cell
         neighbors = set(self.helper.cell_surroundings(cell))
 
@@ -695,7 +709,7 @@ class AllClusters:
 
 @dataclass
 class CellProbability:
-    '''Data about mine probability for one cell
+    ''' Data about mine probability for one cell
     '''
     # Chance this cell is a mine (0 to 1)
     mine_chance: float
@@ -711,7 +725,8 @@ class AllProbabilities(dict):
 
     @staticmethod
     def current_found_mines(helper, field, cell):
-        ''' Return already known mines around "cell" in the "field
+        ''' Return the number of already flagged mines around
+        "cell" in the "field".
         '''
         mine_count = 0
         for neighbor in helper.cell_surroundings(cell):
@@ -720,8 +735,11 @@ class AllProbabilities(dict):
         return mine_count
 
     def get_luckiest(self, clusters, next_moves, original_solver):
-        ''' Pick and return the cell(s) with the lowest mine probability,
-        and, if several, with highest opening probability.
+        ''' Using information about mine probability ,opening probability
+        and so on, return a list of cells with the best chances.
+        Also, if next_moves > 0 look into future games and use chances of mine
+        in the future moves. For that, use "original_solver" - it has current
+        field information
         '''
 
         def simple_best_probability():
@@ -736,36 +754,36 @@ class AllProbabilities(dict):
             cells_best_chances = []
             for cell, mine_chance, opening_chance in cells:
                 if mine_chance == best_mine_chance and \
-                opening_chance == best_opening_chance:
+                   opening_chance == best_opening_chance:
                     cells_best_chances.append(cell)
 
             # Return cells with lowest mine chance and highest open chance.
-            # Later we'll add a logic to look playing "Future" boards to determine
-            # survivability over 2 and more moves. Not right now though.
             return cells_best_chances
 
         def calculate_next_move_survival(cell):
             ''' Calculate survival probability after the NEXT move,
             if we chose to click cell
             '''
-            probable_new_mines = clusters.get_mines_chances(cell)
+            probable_new_numbers = clusters.get_mines_chances(cell)
             # print (f"-- Probable mines: {probable_new_mines}")
 
             # Now go through possible values for that cell
             overall_survival = 0
-            for new_mines_count, new_mines_chance in probable_new_mines.items():
+            for new_number, new_number_chance in probable_new_numbers.items():
                 # print(f"--- Start doing option: ({new_mines_count})")
                 # Copy of the current field
                 new_field = original_solver.field.copy()
 
                 # See how many mines are already there around that cell
-                current_mines = self.current_found_mines(new_solver.helper, new_field, cell)
+                current_mines = self.current_found_mines(new_solver.helper,
+                                                         new_field, cell)
 
                 # Add possible new mines and existing mines.
                 # Replace the cell in question with a probably future value
-                new_field[cell] = new_mines_count + current_mines
+                new_field[cell] = new_number + current_mines
 
-                # Run the solver, use the updated field and decreased recursion value
+                # Run the solver, pass in the updated field and decreased
+                # recursion value
                 new_solver.solve(new_field, next_moves - 1)
 
                 if new_solver.last_move_info[0] == "Probability":
@@ -774,8 +792,10 @@ class AllProbabilities(dict):
                     next_mine_chance = 0
 
                 next_survival = (1 - chance) * (1 - next_mine_chance)
-                # print(f"--- Result: ({new_mines_count}), Survival: {next_survival}")
-                overall_survival += next_survival * new_mines_chance
+
+                # Overall survival is a sum of
+                # "survival if the cell is this number" * chance of this number
+                overall_survival += next_survival * new_number_chance
 
             return overall_survival
 
@@ -792,7 +812,6 @@ class AllProbabilities(dict):
 
             return simple_best_probability()
 
-
         # Keep recursion going: check what will be the mine chance for
         # the next move (Currently being implemented)
 
@@ -803,15 +822,15 @@ class AllProbabilities(dict):
         new_solver = original_solver.copy()
 
         # Calculate probable number of mines in those cells
-        #print(f"Best chances cells: {len(cells_for_recursion)}")
         cells_with_next_move = []
         for cell, chance, opening in cells_for_recursion:
 
-            #print (f"- Cell: {cell}, Chance: {chance}, Opening: {opening}")
+            # Calculate survival rate (both click alive) for this cell
             next_move_survival = calculate_next_move_survival(cell)
 
-            # print (f"-- Cell Survival: {overall_survival}")
-            cells_with_next_move.append((cell, chance, opening, next_move_survival))
+            # Add this information to the cells_with_next_move list
+            cells_with_next_move.append((cell, chance, opening,
+                                         next_move_survival))
 
         # Sort it by 2nd round survival and opening chance
         cells_with_next_move.sort(key=lambda x: (-x[3], x[1], -x[2]))
@@ -823,7 +842,7 @@ class AllProbabilities(dict):
         cells_best_survival = []
         for cell, chance, opening, survival in cells_with_next_move:
             if survival == best_survival and \
-            opening == best_opening:
+               opening == best_opening:
                 cells_best_survival.append(cell)
 
         return cells_best_survival

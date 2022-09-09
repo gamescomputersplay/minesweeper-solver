@@ -102,7 +102,8 @@ class MinesweeperSolver:
     def generate_groups(self):
         ''' Populate self.group with MineGroup objects
         '''
-        # Reset groups and hashes
+
+        # Reset the groups
         self.groups.reset()
 
         # Go over all cells and find all the "Numbered ones"
@@ -132,10 +133,11 @@ class MinesweeperSolver:
             # store it in the self.groups
             if covered_neighbors:
                 new_group = mc.MineGroup(covered_neighbors, active_mines)
-                self.groups.add(new_group)
+                self.groups.add_group(new_group)
 
     def generate_clusters(self):
-        ''' Initiate self.all_clusters and populate it with GroupCluster objects
+        ''' Initiate self.all_clusters and populate it with
+        GroupCluster objects
         '''
         # Reset clusters
         self.all_clusters = mc.AllClusters(self.covered_cells,
@@ -158,7 +160,7 @@ class MinesweeperSolver:
                     # other cluster - add this group
                     if group.belong_to_cluster is None and \
                        new_cluster.overlap(group):
-                        new_cluster.add(group)
+                        new_cluster.add_group(group)
                         break
 
                 # We went through the groups without adding any:
@@ -329,7 +331,7 @@ class MinesweeperSolver:
                    group_b.mines - group_a.mines > 0:
                     new_group = mc.MineGroup(group_b.cells - group_a.cells,
                                              group_b.mines - group_a.mines)
-                    self.groups.add(new_group)
+                    self.groups.add_group(new_group)
 
         return list(set(safe)), list(set(mines))
 
@@ -591,9 +593,9 @@ def main():
 
     settings = mg.GAME_TEST
     settings = mg.GAME_BEGINNER
-    settings = mg.GAME_EXPERT
+    # settings = mg.GAME_EXPERT
 
-    game = mg.MinesweeperGame(settings, seed=0.1007012080683658)
+    game = mg.MinesweeperGame(settings, seed=0)
     solver = MinesweeperSolver(settings)
 
     while game.status == mg.STATUS_ALIVE:

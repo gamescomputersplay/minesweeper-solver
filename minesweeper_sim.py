@@ -1,4 +1,4 @@
-''' Simulator program that plays multiple minesweeper games.
+''' Simulator that plays multiple minesweeper games.
 The game is from minesweeper_game, the solver is from minesweeper_solver
 '''
 
@@ -26,7 +26,8 @@ LOOK_NEXT_MOVES = 1
 
 
 class SolverStat:
-    ''' Class to collect and display statistics about methods, used by solver
+    ''' Class to collect and display various statistics about methods,
+    used by the solver
     '''
 
     def __init__(self):
@@ -48,7 +49,8 @@ class SolverStat:
         self.last_probability_method = None
 
     def add_move(self, last_move_info, safe, mines):
-        ''' Add move information
+        ''' Add information about one move: method name,
+        how many safe cells and mines were found.
         '''
         method, prob_method, chance = last_move_info
 
@@ -74,7 +76,8 @@ class SolverStat:
             self.last_probability_method = prob_method
 
     def add_game(self, result):
-        ''' Add game information
+        ''' Add information about one game: was it lost or won.
+        Based on that last move will be deemed successful or not
         '''
         self.games += 1
         if result == mg.STATUS_WON:
@@ -87,22 +90,23 @@ class SolverStat:
                 -self.probability_data[self.last_probability_method][-1]
 
     def win_rate(self):
-        ''' Return current win_rate
+        ''' Return current win rate
         '''
         if self.games:
             return self.wins / self.games
         return 0
 
     def margin_of_error(self):
-        ''' Current margin of error (95% confidence).
-        In percentage points (+- that many %).
+        ''' Return current margin of error (for 95% confidence interval).
+        Calculated in percentage points (+- that many %), so it can be
+        printed right after the number.
         '''
         win_rate = self.win_rate()
         z_parameter = 1.95  # Corresponds to 95% confidence
         return z_parameter * math.sqrt(win_rate * (1 - win_rate) / self.games)
 
     def table_by_method(self):
-        '''Generate a text table with information about method being used
+        '''Generate a text table with information about method that were used
         '''
         # Sum of all clicked cells
         total_cells = sum(self.data.values())
@@ -123,9 +127,10 @@ class SolverStat:
         return "Clicks by solving method:\n" + table.draw() + "\n\n"
 
     def table_by_probability_method(self):
-        ''' Generate a table with results of various random methods.
-        Stats are presented by "buckets", in two ways: exactly the value
-        and a range between values.
+        ''' Generate a table with results of probability based methods.
+        Stats are presented by "buckets" - with results for each bucket.
+        There are two types of buckets being generated: "exactly that
+        probability" and "range between two probabilities".
         '''
 
         def display_probability(guesses, loses):
@@ -211,7 +216,7 @@ class SolverStat:
         return "Probability accuracy control:\n" + table.draw() + "\n\n"
 
     def __str__(self):
-        ''' Display the stats
+        ''' Return ready-to-print stats
         '''
         win_rate = self.win_rate()
         output = ""
@@ -224,14 +229,15 @@ class SolverStat:
 
 
 class MinesweeperSim:
-    ''' Methods to handle minesweeper game simulation
+    ''' Methods to handle minesweeper simulation
     '''
 
     def __init__(self, settings=mg.GAME_EXPERT,
                  runs=100, seed=None, import_file=None):
 
         def load_import_file(import_file):
-            ''' Read data from the file with saved games
+            ''' Read data from the log file. So you can play games with bot
+            and then play the same games with the simulator.
             '''
             games = []
             with open(import_file, "r", encoding="utf-8") as file:
@@ -272,7 +278,10 @@ class MinesweeperSim:
 
     def one_game(self, field=None, seed=None, verbose=False):
         ''' Playing one game.
-        Verbose would print out the board for every move
+        Field: to play a game with particular mine configuration
+                (numpy array, all except "*" is ignored, "*" are mines)
+        Seed: would pass this seed to the game (None for true random)
+        Verbose: would print out the board and info about last move
         '''
 
         # If field passed in, use it to generate the game
@@ -344,7 +353,7 @@ class MinesweeperSim:
         return self.solver_stat.win_rate()
 
     def print_stats(self):
-        ''' Print out the stats of teh simulation
+        ''' Print out the stats of the simulation
         '''
         timing_info = f"Simulation complete in: {self.spent_time:.0f}s, "
         timing_info += f"Time per game: {self.spent_time / self.runs:.2f}s, "
@@ -354,7 +363,7 @@ class MinesweeperSim:
         print(self.solver_stat)
 
     def __str__(self):
-        ''' Show parameters of teh simulation
+        ''' Return ready-to-print parameters of the simulation
         '''
 
         output = f"Settings: {self.settings}" + \
@@ -370,7 +379,7 @@ def main():
     seed = 0
 
     # games to simulate
-    runs = 100
+    runs = 1000
 
     # All popular minesweeper and multidimensional minesweeper presets
     presets = (mg.GAME_BEGINNER, mg.GAME_INTERMEDIATE, mg.GAME_EXPERT,
