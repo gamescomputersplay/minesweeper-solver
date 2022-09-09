@@ -2,8 +2,10 @@
 '''
 
 import math
+import itertools
 from dataclasses import dataclass
 
+import minesweeper_game as mg
 
 class MineGroup:
     ''' A MineGroup is a set of cells that are known
@@ -60,7 +62,7 @@ class MineGroup:
 
 
 class AllGroups:
-    ''' Functions to handle a group of MineGroup object:
+    ''' Functions to handle a group of MineGroup object (groups and subgroups):
     deduplicate them, generate subgroups ("at least" and "no more than")
     '''
 
@@ -69,6 +71,10 @@ class AllGroups:
         self.hashes = set()
         # List of MineGroups
         self.mine_groups = []
+
+        # Count of regular (exact) groups.
+        # Will be used to save time not iterating through subgroups.
+        self.count_groups = None
 
     def reset(self):
         ''' Clear the data
@@ -103,6 +109,16 @@ class AllGroups:
         ''' For iterator, use the list of groups
         '''
         return iter(self.mine_groups)
+
+    def exact_groups(self):
+        ''' For iterator, use the list of groups
+        '''
+        return itertools.islice(self.mine_groups, self.count_groups)
+
+    def subgroups(self):
+        ''' For iterator, use the list of groups
+        '''
+        return itertools.islice(self.mine_groups, self.count_groups, len(self.mine_groups))
 
     def generate_subgroup_at_least(self):
         ''' Generate "group has at least X mines" subgroup. Add them to groups.
@@ -263,7 +279,7 @@ class GroupCluster:
         if len(self.cells_set) / len(self.groups) > 12 or \
            len(self.cells_set) > 50 or \
            max(math.comb(len(group.cells), group.mines)
-                for group in self.groups) > 1001:
+                for group in self.groups if group.mines > 0) > 1001:
             return
 
         # We need to fix the order of cells, for that we populate self.cells
@@ -438,6 +454,32 @@ class GroupCluster:
             total_mines += sum(probabilities) / len(probabilities)
         self.probable_mines[int(total_mines)] = 1
 
+    def mines_in_cells(self, cells_to_look_at):
+        '''Calculate mine chances in only these particular cells
+        '''
+        # We need to calculate the dict of mine counts and their probability
+        # like this: {0: 0.2, 1: 0.3, 2: 0.5}
+        mine_counts = {}
+
+        # Go through all solution and their weights
+        for solution, weight in zip(self.solutions, self.solution_weights):
+
+            # Calculate mines in cells_to_look_at for each solution
+            mine_count = 0
+            for position, cell in enumerate(self.cells):
+                if cell in cells_to_look_at and solution[position]:
+                    mine_count += 1
+
+            # Accumulate weights for each mine count
+            mine_counts[mine_count] = mine_counts.get(mine_count, 0) + weight
+
+        # Normalize it (divide by total weights)
+        total_weights = sum(self.solution_weights)
+        mine_counts_normalized = {count: weight / total_weights
+                                  for count, weight in mine_counts.items()}
+
+        return mine_counts_normalized
+
     def __str__(self):
         output = f"Cluster with {len(self.groups)} group(s) "
         output += f"and {len(self.cells_set)} cell(s): {self.cells_set}"
@@ -448,7 +490,7 @@ class AllClusters:
     ''' Class that holds all clusters and leftovers data
     '''
 
-    def __init__(self, covered_cells, remaining_mines):
+    def __init__(self, covered_cells, remaining_mines, helper):
         # List of all clusters
         self.clusters = []
 
@@ -460,10 +502,8 @@ class AllClusters:
         # Cells that are not in any cluster
         self.leftover_cells = set()
 
-        # Count and weights of mines in leftover cells. For example:
-        # {3:20, 4:50} - there are 20 ways it can be 3 mines and 50 ways
-        # it can be 4 mines
-        self.in_cluster_weights = {}
+        # Mine count and chances in leftover cells
+        self.leftover_mines_chances = {}
 
         # Average chance of a mine in leftover cells (None if NA)
         self.leftover_mine_chance = None
@@ -471,6 +511,9 @@ class AllClusters:
         # Bring these two from the solver object
         self.covered_cells = covered_cells
         self.remaining_mines = remaining_mines
+
+        # And a helper from solver class
+        self.helper = helper
 
     def calculate_all(self):
         '''Perform all cluster-related calculations: solve clusters,
@@ -483,7 +526,8 @@ class AllClusters:
             # it, but get the probable mines  from the "cache" - we'll need it
             # for probability method
             if cluster.calculate_hash() in self.clusters_history:
-                cluster.probable_mines = \
+                cluster.probable_mines, cluster.solutions, \
+                    cluster.solution_weights = \
                     self.clusters_history[cluster.calculate_hash()]
                 continue
 
@@ -497,7 +541,8 @@ class AllClusters:
 
             # Save cluster's hash in history for deduplication
             self.clusters_history[cluster.calculate_hash()] = \
-                cluster.probable_mines
+                (cluster.probable_mines,
+                 cluster.solutions, cluster.solution_weights)
 
     def calculate_leftovers(self):
         '''Based on count and probabilities of mines in cluster, calculate
@@ -546,29 +591,106 @@ class AllClusters:
         # in the leftover cells.
         # Last line here is case there are permutations that exceed
         # the total number of remaining mines
-        self.in_cluster_weights = {mines: math.comb(len(self.leftover_cells),
-                                   self.remaining_mines - mines) * solutions
-                                   for mines, solutions in cross_mines.items()
-                                   if self.remaining_mines - mines >= 0}
+        leftover_mines_counts = \
+            {self.remaining_mines - mines:
+             math.comb(len(self.leftover_cells),
+                       self.remaining_mines - mines) * solutions
+             for mines, solutions in cross_mines.items()
+             if self.remaining_mines - mines >= 0}
 
-        # Total weights for all mine counts
-        total_weights = sum(self.in_cluster_weights.values())
+        # Total weights for all leftover mine counts
+        total_weights = sum(leftover_mines_counts.values())
 
         # If the cluster was not solved total weight would be zero.
         if total_weights == 0:
             return
 
-        # Total number of mines in all clusters
-        # (sum of count * probability)
-        mines_in_clusters = sum(mines * weight / total_weights
-                                for mines, weight
-                                in self.in_cluster_weights.items())
+        self.leftover_mines_chances = {mines: weight / total_weights
+                                       for mines, weight
+                                       in leftover_mines_counts.items()}
 
-        # All mines not in clusters are leftovers
-        leftover_mines = self.remaining_mines - mines_in_clusters
+        # Total number of mines in leftover cells
+        # (sum of count * probability)
+        leftover_mines = sum(mines * chance
+                             for mines, chance
+                             in self.leftover_mines_chances.items())
 
         # And this is the probability of a mine in those cells
         self.leftover_mine_chance = leftover_mines / len(self.leftover_cells)
+
+    def mines_in_leftover_part(self, part_size):
+        ''' Calculate mine chances in the part of size "part_size"
+        of the leftover cells .
+        '''
+        overall_mine_chances = {}
+
+        # We are looking at all possible mine counts in leftovers
+        for all_leftover_mines, leftover_mines_chance in \
+                self.leftover_mines_chances.items():
+
+            # If there more mines than cells for them - ignore such option
+            if len(self.leftover_cells) < all_leftover_mines:
+                continue
+
+            # Then, for all possible mine counts in the part
+            for mines_in_part in range(min(part_size, all_leftover_mines) + 1):
+                # Chance that there will be that many mines
+                # Comb of mines in part * comb of mines in remaining part /
+                # total combinations in leftover
+                chance_in_part = \
+                    math.comb(part_size, mines_in_part) * \
+                    math.comb(len(self.leftover_cells) - part_size,
+                              all_leftover_mines - mines_in_part) / \
+                    math.comb(len(self.leftover_cells), all_leftover_mines)
+
+                # Overall chance is a product of: 1. chance tha we have
+                # mines_in_part in part 2. chance that there are
+                # all_leftover_mines in leftovers
+                overall_mine_chances[mines_in_part] = \
+                    overall_mine_chances.get(mines_in_part, 0) + \
+                    chance_in_part * leftover_mines_chance
+
+        return overall_mine_chances
+
+    def get_mines_chances(self, cell):
+        ''' Calculate chances of mine count for this particular cell
+        '''
+        # Get the list of neighbors for this cell
+        neighbors = set(self.helper.cell_surroundings(cell))
+
+        # Calculate mine chances in leftovers
+        # First find out, which cells are part of the leftovers
+        leftover_overlap = neighbors.intersection(self.leftover_cells)
+        # Then calculate mine chances for those cells
+        mines_chances = self.mines_in_leftover_part(len(leftover_overlap))
+        # print(f"Mines in leftover: {mines_chances}")
+
+        # Calculate the mine chances for each cluster
+        for cluster in self.clusters:
+
+            # These are the cells in neighbors that belong to this cluster
+            cluster_overlap = neighbors.intersection(cluster.cells_set)
+            # Calculate the mine chances for those cells
+            mines_chances_in_cluster = cluster.mines_in_cells(cluster_overlap)
+            # print(f"Mines in cluster: {mines_chances_in_cluster}")
+
+            # Overall mine chances are {sum of mines: product of chances}
+            # for all clusters and leftovers. This part keeps a running "total"
+            # after calculating each cluster.
+            updated_mine_chances = {}
+            for cluster_mines, cluster_chance in \
+                    mines_chances_in_cluster.items():
+
+                for current_mines, current_chances in \
+                        mines_chances.items():
+                    combined_mines = current_mines + cluster_mines
+                    updated_mine_chances[combined_mines] = \
+                        updated_mine_chances.get(combined_mines, 0) + \
+                        cluster_chance * current_chances
+
+            mines_chances = updated_mine_chances
+
+        return mines_chances
 
 
 @dataclass
@@ -581,18 +703,82 @@ class CellProbability:
     source: str
     # Chance it would be an opening (no mines in surrounding cells)
     opening_chance: float = 0
-    # Number of solved cells in the next round, if this cell is uncovered
-    next_sure_clicks: int = 0
 
 
 class AllProbabilities(dict):
     '''Class to work with probability-based information about cells
     '''
 
-    def pick_lowest_probability(self):
+    @staticmethod
+    def current_found_mines(helper, field, cell):
+        ''' Return already known mines around "cell" in the "field
+        '''
+        mine_count = 0
+        for neighbor in helper.cell_surroundings(cell):
+            if field[neighbor] == mg.CELL_MINE:
+                mine_count += 1
+        return mine_count
+
+    def get_luckiest(self, clusters, next_moves, original_solver):
         ''' Pick and return the cell(s) with the lowest mine probability,
         and, if several, with highest opening probability.
         '''
+
+        def simple_best_probability():
+            ''' Calculating probability without looking into next moves:
+            just pick lowest mine chance with highest opening chance.
+            Return a list if several.
+            '''
+            # This is the best chances
+            _, best_mine_chance, best_opening_chance = cells[0]
+
+            # Pick cells with the best probability and opening chances
+            cells_best_chances = []
+            for cell, mine_chance, opening_chance in cells:
+                if mine_chance == best_mine_chance and \
+                opening_chance == best_opening_chance:
+                    cells_best_chances.append(cell)
+
+            # Return cells with lowest mine chance and highest open chance.
+            # Later we'll add a logic to look playing "Future" boards to determine
+            # survivability over 2 and more moves. Not right now though.
+            return cells_best_chances
+
+        def calculate_next_move_survival(cell):
+            ''' Calculate survival probability after the NEXT move,
+            if we chose to click cell
+            '''
+            probable_new_mines = clusters.get_mines_chances(cell)
+            # print (f"-- Probable mines: {probable_new_mines}")
+
+            # Now go through possible values for that cell
+            overall_survival = 0
+            for new_mines_count, new_mines_chance in probable_new_mines.items():
+                # print(f"--- Start doing option: ({new_mines_count})")
+                # Copy of the current field
+                new_field = original_solver.field.copy()
+
+                # See how many mines are already there around that cell
+                current_mines = self.current_found_mines(new_solver.helper, new_field, cell)
+
+                # Add possible new mines and existing mines.
+                # Replace the cell in question with a probably future value
+                new_field[cell] = new_mines_count + current_mines
+
+                # Run the solver, use the updated field and decreased recursion value
+                new_solver.solve(new_field, next_moves - 1)
+
+                if new_solver.last_move_info[0] == "Probability":
+                    next_mine_chance = new_solver.last_move_info[2]
+                else:
+                    next_mine_chance = 0
+
+                next_survival = (1 - chance) * (1 - next_mine_chance)
+                # print(f"--- Result: ({new_mines_count}), Survival: {next_survival}")
+                overall_survival += next_survival * new_mines_chance
+
+            return overall_survival
+
         # Copy the info into a list, so we can just sort it
         cells = [(cell, cell_info.mine_chance, cell_info.opening_chance)
                  for cell, cell_info in self.items()]
@@ -600,20 +786,47 @@ class AllProbabilities(dict):
         # Sort by 1. mine chance 2. opening chance. Put the best at the end
         cells.sort(key=lambda x: (x[1], -x[2]))
 
-        # This is the best chances
-        _, best_mine_chance, best_opening_chance = cells[0]
-        cells_best_chances = []
+        # End of recursion, don't go deeper
+        # Just return all cells with best mine and open chances
+        if next_moves == 0:
 
-        # Pick cells with the best probability and opening chances
-        for cell, mine_chance, opening_chance in cells:
-            if mine_chance == best_mine_chance and \
-               opening_chance == best_opening_chance:
-                cells_best_chances.append(cell)
+            return simple_best_probability()
 
-        # Return cells with lowest mine chance and highest open chance.
-        # Later we'll add a logic to look playing "Future" boards to determine
-        # survivability over 2 and more moves. Not right now though.
-        return cells_best_chances
+
+        # Keep recursion going: check what will be the mine chance for
+        # the next move (Currently being implemented)
+
+        # Pick 5 or fewer cells to look into 2nd move chances
+        cells_for_recursion = cells[:5]
+
+        # Make a copy of the solver (so not to regenerate helpers)
+        new_solver = original_solver.copy()
+
+        # Calculate probable number of mines in those cells
+        #print(f"Best chances cells: {len(cells_for_recursion)}")
+        cells_with_next_move = []
+        for cell, chance, opening in cells_for_recursion:
+
+            #print (f"- Cell: {cell}, Chance: {chance}, Opening: {opening}")
+            next_move_survival = calculate_next_move_survival(cell)
+
+            # print (f"-- Cell Survival: {overall_survival}")
+            cells_with_next_move.append((cell, chance, opening, next_move_survival))
+
+        # Sort it by 2nd round survival and opening chance
+        cells_with_next_move.sort(key=lambda x: (-x[3], x[1], -x[2]))
+
+        # This is the best 2-step survival
+        _, _, best_opening, best_survival = cells_with_next_move[0]
+
+        # Pick cells with the best survival and opening chances
+        cells_best_survival = []
+        for cell, chance, opening, survival in cells_with_next_move:
+            if survival == best_survival and \
+            opening == best_opening:
+                cells_best_survival.append(cell)
+
+        return cells_best_survival
 
 
 def main():

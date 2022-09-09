@@ -12,7 +12,7 @@ import minesweeper_classes as mc
 class MinesweeperSolver:
     ''' Methods related to solving minesweeper game. '''
 
-    def __init__(self, settings=mg.GAME_BEGINNER):
+    def __init__(self, settings=mg.GAME_BEGINNER, helper=None):
         ''' Initiate the solver. Only required game settings
         '''
 
@@ -21,8 +21,14 @@ class MinesweeperSolver:
         # N umber of total mines in the game
         self.total_mines = settings.mines
 
+        # If there is no helper passed in,
         # Initiate helper (iteration through all cells, neighbors etc)
-        self.helper = mg.MinesweeperHelper(self.shape)
+        # Helper is reused by future instances to save time
+        # (initiating helper is a rather costly operation)
+        if helper is None:
+            self.helper = mg.MinesweeperHelper(self.shape)
+        else:
+            self.helper = helper
 
         # Placeholder for the field. Will be populated by self.solve()
         self.field = None
@@ -37,8 +43,8 @@ class MinesweeperSolver:
         self.groups = mc.AllGroups()
 
         # Placeholder for clusters (main element of CSP method)
-        self.all_clusters = \
-            mc.AllClusters(self.covered_cells, self.remaining_mines)
+        self.all_clusters = mc.AllClusters(self.covered_cells,
+                                           self.remaining_mines, self.helper)
 
         # Placeholder for mine probability data
         # {cell: probability_of_it_being_a_mine}
@@ -53,6 +59,14 @@ class MinesweeperSolver:
         # ("method name", probability). Probability make sense if it
         # was "Random"
         self.last_move_info = None
+
+    def copy(self):
+        '''Create a copy of solver object.
+        Reuse settings and helper from the original one
+        '''
+        settings = mg.GameSettings(self.shape, self.total_mines)
+        new_solver = MinesweeperSolver(settings, helper=self.helper)
+        return new_solver
 
     def generate_all_covered(self):
         ''' Return the list of all covered cells
@@ -111,8 +125,8 @@ class MinesweeperSolver:
         '''Populate self.clusters with cell clusters
         '''
         # Reset clusters
-        self.all_clusters = \
-            mc.AllClusters(self.covered_cells, self.remaining_mines)
+        self.all_clusters = mc.AllClusters(self.covered_cells,
+                                           self.remaining_mines, self.helper)
         # Reset all "belong to cluster" information from the groups
         self.groups.reset_clusters()
 
@@ -126,11 +140,10 @@ class MinesweeperSolver:
             while True:
 
                 # Look through all groups
-                for group in self.groups:
+                for group in self.groups.exact_groups():
                     # If it overlaps with this group and not part of any
                     # other cluster - add this group
-                    if group.group_type == "exactly" and \
-                       group.belong_to_cluster is None and \
+                    if group.belong_to_cluster is None and \
                        new_cluster.overlap(group):
                         new_cluster.add(group)
                         break
@@ -159,11 +172,7 @@ class MinesweeperSolver:
                 # unaccounted cells
                 best_count = None
                 best_group = None
-                for group in self.groups:
-
-                    # We only need "exactly" groups
-                    if group.group_type != "exactly":
-                        continue
+                for group in self.groups.exact_groups():
 
                     # If group overlaps with what we have so far -
                     # we don't need such group
@@ -314,6 +323,9 @@ class MinesweeperSolver:
         ''' Subgroups method. Based on breaking groups down "at least" and
         "no more than" subgroups and cross checking them with groups.
         '''
+        # Note how many groups we have
+        self.groups.count_groups = len(self.groups.mine_groups)
+
         # Generate subgroups
         # Funny thing, it actually works just as well with only one
         # (either) of these two generated
@@ -326,12 +338,13 @@ class MinesweeperSolver:
         # cross-check all the groups, but this time
         # we only will check "at least" and "no more than"
         # subgroups
-        for group_a in self.groups:
-            for group_b in self.groups:
+        # Group A are all subgroups (at least, no more)
+        for group_a in self.groups.subgroups():
+            # Group B are all groups (exactly)
+            for group_b in self.groups.exact_groups():
 
                 # Only compare subgroups "at least" to groups.
-                if group_a.group_type == "at least" and \
-                   group_b.group_type == "exactly":
+                if group_a.group_type == "at least":
 
                     # Similar to "groups" method: if mines are the same,
                     # the difference is safe
@@ -340,8 +353,7 @@ class MinesweeperSolver:
                     safe.extend(self.deduce_safe(group_a, group_b))
 
                 # Only compare subgroups "no more than" to groups.
-                if group_a.group_type == "no more than" and \
-                   group_b.group_type == "exactly":
+                if group_a.group_type == "no more than":
 
                     # Similar to "groups" method: if mines are the same,
                     # the difference is safe
@@ -405,10 +417,7 @@ class MinesweeperSolver:
             Each cell's probability is: max(group_mines / group_cells, ...),
             for all cells it is in.
             '''
-            for group in self.groups:
-                # We only need "exactly" type of groups
-                if group.group_type != "exactly":
-                    continue
+            for group in self.groups.exact_groups():
 
                 # Probability of each mine in teh group
                 group_probability = group.mines / len(group.cells)
@@ -487,14 +496,14 @@ class MinesweeperSolver:
         '''
         return random.choice(cells)
 
-    def solve(self, field, use_probability=True):
+    def solve(self, field, next_moves=1):
         ''' Main solving function.
         Go through various solving methods and return safe and mines lists
         as long as any of the methods return results
         In:
         - the field (what has been uncovered so far).
-        - use_probability: True for regular use. False for using only
-        deterministic methods: this  mode is to estimate worth of next moves
+        - next_moves: remaining levels of recursion to look for mine chances
+          in the 2nd, 3rd and so on moves
         Out:
         - list of safe cells
         - list of mines
@@ -532,28 +541,26 @@ class MinesweeperSolver:
                 self.last_move_info = (method_name, None, None)
                 return safe, mines
 
-        # Deterministic methods are over. If we  are not supposed to use
-        # probability-based ones, our job here is done.
-        if not use_probability:
-            return safe, mines
-
         # Calculate mine probability using various methods
         self.calculate_probabilities()
         # Calculate opening chances
         self.calculate_opening_chances()
 
-        # Pick a cell that is least likely a mine
-        lucky_cells = self.probability.pick_lowest_probability()
+        # Get cells that is least likely a mine
+        lucky_cells = \
+            self.probability.get_luckiest(self.all_clusters, next_moves, self)
 
         if lucky_cells:
+            # There may be more than one such cells, pick a random one
             lucky_cell = self.pick_a_random_cell(lucky_cells)
+            # Store information about expected chance of mine and how
+            # this chance was calculated
             self.last_move_info = ("Probability",
                                    self.probability[lucky_cell].source,
                                    self.probability[lucky_cell].mine_chance)
             return [lucky_cell, ], None
 
-        # Until the count method implemented, there is a chance of
-        # "exclave" cells. This is a catch-all for that
+        # This should not happen, but here's a catch-all if it does
         self.last_move_info = ("Last Resort", None)
         return [self.pick_a_random_cell(self.covered_cells), ], None
 
@@ -564,8 +571,9 @@ def main():
 
     settings = mg.GAME_TEST
     settings = mg.GAME_BEGINNER
+    settings = mg.GAME_EXPERT
 
-    game = mg.MinesweeperGame(settings, seed=0.7576039219664368)
+    game = mg.MinesweeperGame(settings, seed=0.1007012080683658)
     solver = MinesweeperSolver(settings)
 
     while game.status == mg.STATUS_ALIVE:

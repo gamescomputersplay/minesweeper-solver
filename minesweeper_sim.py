@@ -17,8 +17,12 @@ import minesweeper_solver as ms
 # Whether to display progress bar for a simulation
 # May have issues on some IDEs
 USE_PROGRESS_BAR = True
+SHOW_SEED = False
 SHOW_METHODS_STAT = True
 SHOW_PROBABILITY_STAT = True
+
+# How many moves ahead analyze (0 - only the current position)
+LOOK_NEXT_MOVES = 1
 
 
 class SolverStat:
@@ -223,7 +227,8 @@ class MinesweeperSim:
     ''' Methods to handle minesweeper game simulation
     '''
 
-    def __init__(self, settings=mg.GAME_EXPERT, runs=100, seed=None, import_file=None):
+    def __init__(self, settings=mg.GAME_EXPERT,
+                 runs=100, seed=None, import_file=None):
 
         def load_import_file(import_file):
             ''' Read data from the file with saved games
@@ -237,9 +242,10 @@ class MinesweeperSim:
         # Game settings (field dimensions, mine count)
         self.settings = settings
 
-        # If import file passed: load games from it, set the runs to the length of the file
+        # If import file passed: load games from it,
+        # set the runs to the length of the file
         if import_file is not None:
-            self.game_fields  = load_import_file(import_file)
+            self.game_fields = load_import_file(import_file)
             self.runs = len(self.game_fields)
             self.game_seeds = None
 
@@ -278,7 +284,8 @@ class MinesweeperSim:
 
         while game.status == mg.STATUS_ALIVE:
 
-            safe, mines = self.solver.solve(game.uncovered)
+            safe, mines = self.solver.solve(game.uncovered,
+                                            next_moves=LOOK_NEXT_MOVES)
             if verbose:
                 print(f"Player: safe={safe}, mines={mines}")
             game.make_a_move(safe, mines)
@@ -294,10 +301,11 @@ class MinesweeperSim:
         self.solver_stat.add_game(game.status)
 
         # Notify if deterministic method resulted in death
-        # This should not happen though
+        # Should not happen, if it does, there is an error in that method
         if game.status == mg.STATUS_DEAD and \
            self.solver.last_move_info[0] != "Probability":
-            print(f"Warning: death by method '{self.solver.last_move_info[0]}'")
+            print("Warning: death by deterministic method",
+                  self.solver.last_move_info[0])
 
         if verbose:
             print(f"Result: {mg.STATUS_MESSAGES[game.status]}")
@@ -320,7 +328,13 @@ class MinesweeperSim:
         for _ in iterator:
             # Play game either from seeds or fields
             if self.game_seeds is not None:
-                self.one_game(seed=self.game_seeds.pop())
+
+                # Seed to start the game with
+                seed = self.game_seeds.pop()
+                if SHOW_SEED:
+                    print(f"Seed: {seed}")
+
+                self.one_game(seed=seed)
             else:
                 self.one_game(field=self.game_fields.pop())
 
@@ -365,13 +379,13 @@ def main():
                mg.GAME_4D_HARDER)
     # Only 2D (traditional) minesweeper presets
     presets = (mg.GAME_BEGINNER, mg.GAME_INTERMEDIATE, mg.GAME_EXPERT)
-    # Only a small, beginner 2D board (for testing)
+    # Only an expert 2D board
     presets = (mg.GAME_EXPERT, )
 
     for settings in presets:
 
         # Run simulation from file
-        #simulation = MinesweeperSim(settings, import_file="logfile.log")
+        # simulation = MinesweeperSim(settings, import_file="logfile.log")
 
         # Run simulation from a seed
         simulation = MinesweeperSim(settings, runs, seed)
