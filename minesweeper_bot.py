@@ -21,7 +21,8 @@ class MinesweeperBotSettings():
     Default one is for Minesweeper X.
     '''
 
-    def __init__(self, field_color, samples_files):
+    def __init__(self, field_color, samples_files,
+                 cell_padding=1, click_pause=0.05, sample_sensitivity=3000):
 
         # Color used to find a grid. This should be the most central color
         # of a closed cell (or several colors if it is a chess-board-like,
@@ -33,36 +34,20 @@ class MinesweeperBotSettings():
                         for file, value in samples_files.items()]
 
         # How many pixels to pad when cut out a cell picture
-        self.sample_sensitivity = 3000
+        self.sample_sensitivity = sample_sensitivity
 
         # Minimum size to be considered a potential cell
         # (to rule out random small specks)
         self.minimum_cell_size = 10
 
         # How many pixels to pad when cut out a cell picture
-        self.cell_padding = 1
+        self.cell_padding = cell_padding
+
+        # Pause after a click (to give game  time to react)
+        self.click_pause = click_pause
 
 
-SETTINGS_MINESWEEPER_X_125 = MinesweeperBotSettings(
-    field_color=[(192, 192, 192), (192, 192, 192, 255)],
-    samples_files={
-        "samples/msx-125-0.png": 0,
-        "samples/msx-125-1.png": 1,
-        "samples/msx-125-2.png": 2,
-        "samples/msx-125-3.png": 3,
-        "samples/msx-125-4.png": 4,
-        "samples/msx-125-5.png": 5,
-        "samples/msx-125-6.png": 6,
-        "samples/msx-125-7.png": 7,
-        "samples/msx-125-covered.png": mg.CELL_COVERED,
-        "samples/msx-125-mine.png": mg.CELL_MINE,
-        "samples/msx-125-flag.png": mg.CELL_MINE,
-        "samples/msx-125-explosion.png": mg.CELL_EXPLODED_MINE,
-        "samples/msx-125-false.png": mg.CELL_FALSE_MINE,
-        }
-    )
-
-SETTINGS_MINESWEEPER_X = MinesweeperBotSettings(
+SETTINGS_MINESWEEPER_CLASSIC = MinesweeperBotSettings(
     field_color=[(192, 192, 192), (192, 192, 192, 255)],
     samples_files={
         "samples/msx-0.png": 0,
@@ -81,8 +66,31 @@ SETTINGS_MINESWEEPER_X = MinesweeperBotSettings(
         }
     )
 
+SETTINGS_MINESWEEPER_4D = MinesweeperBotSettings(
+    field_color=[(153, 153, 153), (153, 153, 153, 255)],
+    samples_files={
+        "samples/4d-0-a.png": 0,
+        "samples/4d-0-b.png": 0,
+        "samples/4d-1-a.png": 1,
+        "samples/4d-1-b.png": 1,
+        "samples/4d-2-a.png": 2,
+        "samples/4d-2-b.png": 2,
+        "samples/4d-3-a.png": 3,
+        "samples/4d-3-b.png": 3,
+        "samples/4d-4-a.png": 4,
+        "samples/4d-5-a.png": 5,
+        "samples/4d-6-a.png": 6,
 
-# SETTING_GOOGLE_MINESWEEPER.field_color = [(146, 217, 43), (155, 223, 54)]
+        "samples/4d-flag-a.png": mg.CELL_MINE,
+        "samples/4d-flag-b.png": mg.CELL_MINE,
+        "samples/4d-false-a.png": mg.CELL_FALSE_MINE,
+        "samples/4d-covered.png": mg.CELL_COVERED,
+        "samples/4d-explosion.png": mg.CELL_EXPLODED_MINE,
+        },
+    cell_padding=-2,
+    click_pause=0.5,
+    sample_sensitivity=10000
+    )
 
 
 class MinesweeperBot:
@@ -90,7 +98,7 @@ class MinesweeperBot:
     read the cells' values, click and so on
     '''
 
-    def __init__(self, settings=SETTINGS_MINESWEEPER_X):
+    def __init__(self, settings=SETTINGS_MINESWEEPER_CLASSIC):
         # Bot settings, which colors are used to find and read the field
         self.settings = settings
         # The shape of the field (width and height for 2D games,
@@ -259,8 +267,8 @@ class MinesweeperBot:
         found = find_all_squares()
 
         if len(found) < 10:
-            print("Cannot fine the game")
-            return
+            print("Cannot find the game")
+            return False
 
         # Filter those that are on the same grid
         found = filter_grid(found)
@@ -276,6 +284,8 @@ class MinesweeperBot:
         # Initiate solver
         settings = mg.GameSettings(self.game_shape, self.game_mines)
         self.solver = ms.MinesweeperSolver(settings)
+
+        return True
 
     def read_field(self, image):
         ''' Read the information from the field: covered and uncovered cells,
@@ -435,6 +445,11 @@ class MinesweeperBot:
         if actually_do_clicks:
             self.do_clicks(safe, mines)
 
+            # Quick pause to make sure game have time to react
+            # and we get updated info on the screen
+            # Seems to be REALLY important to the win rate
+            time.sleep(self.settings.click_pause)
+
         # This status is more for consistency
         return mg.STATUS_ALIVE
 
@@ -445,10 +460,13 @@ def use_bot(games_to_play=100):
     '''
 
     # Create a new bot object
-    bot = MinesweeperBot(SETTINGS_MINESWEEPER_X)
+    bot = MinesweeperBot(SETTINGS_MINESWEEPER_4D)
 
     # Find the game on the screen
-    bot.find_game()
+    game_found = bot.find_game()
+
+    if not game_found:
+        return
 
     wins = 0
 
@@ -461,11 +479,6 @@ def use_bot(games_to_play=100):
 
             # Read a screen, do clicks
             result = bot.make_a_move()
-
-            # Quick pause to make sure game have time to react
-            # and we get updated info on the screen
-            # Seems to be REALLY important to the win rate
-            time.sleep(.05)
 
             # Out if we won or lost
             if result == mg.STATUS_DEAD:
