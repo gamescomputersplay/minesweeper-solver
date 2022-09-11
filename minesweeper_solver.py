@@ -510,6 +510,18 @@ class MinesweeperSolver:
             else:
                 self.probability[cell].opening_chance = zero_chance
 
+    def calculate_frontier(self):
+        ''' Populate frontier (how many groups may be affected by this cell)
+        '''
+        # Generate frontier
+        self.groups.generate_frontier()
+
+        for cell in self.groups.frontier:
+            for neighbors in self.helper.cell_surroundings(cell):
+                if neighbors in self.probability:
+                    self.probability[neighbors].frontier += 1
+
+
     @staticmethod
     def pick_a_random_cell(cells):
         '''Pick a random cell out of the list of cells.
@@ -567,6 +579,8 @@ class MinesweeperSolver:
         self.calculate_probabilities()
         # Calculate opening chances
         self.calculate_opening_chances()
+        # Calculate frontier values
+        self.calculate_frontier()
 
         # Get cells that is least likely a mine
         lucky_cells = \
@@ -593,14 +607,14 @@ def main():
 
     settings = mg.GAME_TEST
     settings = mg.GAME_BEGINNER
-    # settings = mg.GAME_EXPERT
+    settings = mg.GAME_EXPERT
 
-    game = mg.MinesweeperGame(settings, seed=0)
+    game = mg.MinesweeperGame(settings, seed=1)
     solver = MinesweeperSolver(settings)
 
     while game.status == mg.STATUS_ALIVE:
 
-        safe, mines = solver.solve(game.uncovered)
+        safe, mines = solver.solve(game.uncovered, next_moves=0)
         method, random_method, chance = solver.last_move_info
 
         chance_str, random_method_str = "", ""

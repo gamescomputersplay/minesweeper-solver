@@ -81,6 +81,9 @@ class AllGroups:
         # Used to save time iterating only through groups or subgroups.
         self.count_groups = None
 
+        # Frontier: list of cells that belong to at least ong group
+        self.frontier = []
+
     def reset(self):
         ''' Clear the data of the groups
         '''
@@ -89,6 +92,7 @@ class AllGroups:
         # For some reason result is 0.1% better if I don't reset count_groups
         # It does not make sene to me, I can't find why. But so be it.
         # self.count_groups = None
+        self.frontier = []
 
     def reset_clusters(self):
         ''' Clear "belong to cluster" for each group.
@@ -112,6 +116,15 @@ class AllGroups:
         if new_group.hash not in self.hashes:
             self.mine_groups.append(new_group)
             self.hashes.add(new_group.hash)
+
+    def generate_frontier(self):
+        ''' Populate self.frontier - list of cells belonging to any group
+        '''
+        frontier = set()
+        for group in self:
+            for cell in group.cells:
+                frontier.add(cell)
+        self.frontier = list(frontier)
 
     def __iter__(self):
         ''' Iterator for the groups
@@ -717,7 +730,8 @@ class CellProbability:
     source: str
     # Chance it would be an opening (no mines in surrounding cells)
     opening_chance: float = 0
-
+    # Frontier value: how many groups is this cell a part of
+    frontier: int = 0
 
 class AllProbabilities(dict):
     '''Class to work with probability-based information about cells
@@ -748,13 +762,14 @@ class AllProbabilities(dict):
             Return a list if several.
             '''
             # This is the best chances
-            _, best_mine_chance, best_opening_chance = cells[0]
+            _, best_mine_chance, best_opening_chance, best_frontier = cells[0]
 
             # Pick cells with the best probability and opening chances
             cells_best_chances = []
-            for cell, mine_chance, opening_chance in cells:
+            for cell, mine_chance, opening_chance, frontier in cells:
                 if mine_chance == best_mine_chance and \
-                   opening_chance == best_opening_chance:
+                   opening_chance == best_opening_chance and \
+                   frontier == best_frontier:
                     cells_best_chances.append(cell)
 
             # Return cells with lowest mine chance and highest open chance.
@@ -800,11 +815,12 @@ class AllProbabilities(dict):
             return overall_survival
 
         # Copy the info into a list, so we can just sort it
-        cells = [(cell, cell_info.mine_chance, cell_info.opening_chance)
+        cells = [(cell, cell_info.mine_chance, cell_info.opening_chance, cell_info.frontier)
                  for cell, cell_info in self.items()]
 
-        # Sort by 1. mine chance 2. opening chance. Put the best at the end
-        cells.sort(key=lambda x: (x[1], -x[2]))
+        # Sort by 1. mine chance 2. frontier and opening chance.
+        # Put the best in the beginning
+        cells.sort(key=lambda x: (x[1], -x[2], -x[3]))
 
         # End of recursion, don't go deeper
         # Just return all cells with best mine and open chances
@@ -823,7 +839,7 @@ class AllProbabilities(dict):
 
         # Calculate probable number of mines in those cells
         cells_with_next_move = []
-        for cell, chance, opening in cells_for_recursion:
+        for cell, chance, opening, _ in cells_for_recursion:
 
             # Calculate survival rate (both click alive) for this cell
             next_move_survival = calculate_next_move_survival(cell)
