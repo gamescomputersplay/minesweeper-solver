@@ -99,16 +99,22 @@ class MinesweeperBot:
     read the cells' values, click and so on
     '''
 
-    def __init__(self, settings=SETTINGS_MINESWEEPER_CLASSIC):
+    def __init__(self, settings=SETTINGS_MINESWEEPER_CLASSIC, mines=None):
+        ''' IN:
+                - settings: a MinesweeperBotSettings with color settings to read
+                the field from the screenshot
+                - mines: override a number of mines, if it  is not a standard one
+        '''
         # Bot settings, which colors are used to find and read the field
         self.settings = settings
+
         # The shape of the field (width and height for 2D games,
         # or higher order tuple for n-dimensional games)
         self.game_shape = None
 
         # Number of mines in a game (Tries to guess, if it is one of
         # a standard 2D sizes, but otherwise has to be set up manually)
-        self.game_mines = 0
+        self.game_mines = mines
 
         # Coordinates of the game on the screen
         self.cells_coordinates = None
@@ -264,8 +270,7 @@ class MinesweeperBot:
             game_mines = 0
 
             # Mine counts to recognize
-            game_presets = {(8, 8): 10, (9, 9): 10, (16, 16): 40, (30, 16): 99,
-                            (10, 8): 10, (18, 14): 40, (24, 20): 99}
+            game_presets = {(8, 8): 10, (9, 9): 10, (16, 16): 40, (30, 16): 99}
 
             if (game_width, game_height) in game_presets:
                 game_mines = game_presets[(game_width, game_height)]
@@ -300,9 +305,15 @@ class MinesweeperBot:
         found = filter_grid(found)
 
         # Determine game parameters (size, mines), from the found grid
-        self.game_shape, self.game_mines = deduce_game_parameters(found)
-        print(f"Found game of the size {self.game_shape}, " +
-              f"assuming {self.game_mines} mines")
+        self.game_shape, deduced_mines = deduce_game_parameters(found)
+        print(f"Found game of the size {self.game_shape}")
+
+        # If no mine count passed to the bot - try to assume from the game size
+        if self.game_mines is None:
+            self.game_mines = deduced_mines
+            print(f"Assuming {self.game_mines} mines")
+        else:
+            print(f"Mines are set to {self.game_mines}")
 
         # Sort them into rows and columns, store it in self.cells_coordinates
         self.cells_coordinates = arrange_cells(found)
@@ -478,7 +489,6 @@ class MinesweeperBot:
 
         # This status is more for consistency
         return mg.STATUS_ALIVE
-
 
 
 def use_bot(games_to_play=100):
