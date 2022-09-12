@@ -4,6 +4,7 @@ Uses minesweeper solver in minesweeper_solver.py
 '''
 
 import time
+import math
 
 import pyautogui
 import keyboard
@@ -123,6 +124,31 @@ class MinesweeperBot:
         # Default pause between clicks is is 0.1 (meaning there will be
         # 40 seconds of pause on the Expert game). Let's speed it up.
         pyautogui.PAUSE = 0.01
+
+    @staticmethod
+    def transform_to_4d(field):
+        ''' Transform 2D field (the way is it read from the picture)
+        to the 4D field (to play it)
+        '''
+        # Only works for 4d cubes (all 4d sized should be equal)
+        new_side = int(math.sqrt(field.shape[0]))
+        new_shape = (new_side, new_side, new_side, new_side)
+        field_4d = np.zeros(new_shape, dtype=int)
+
+        # Go though all the current coordinates
+        # and fill the new 4d field
+        # order is: big rows, big columns, small rows, small columns
+        for i in range(field.shape[0]):
+            for j in range(field.shape[1]):
+
+                new_x = j // new_side
+                new_y = i // new_side
+                new_z = j % new_side
+                new_w = i % new_side
+
+                field_4d[new_x, new_y, new_z, new_w] = field[i, j]
+
+        return field_4d
 
     def find_game(self, image=None):
         '''Find game field by looking for squares of color "colors",
@@ -460,7 +486,7 @@ def use_bot(games_to_play=100):
     '''
 
     # Create a new bot object
-    bot = MinesweeperBot(SETTINGS_MINESWEEPER_4D)
+    bot = MinesweeperBot(SETTINGS_MINESWEEPER_CLASSIC)
 
     # Find the game on the screen
     game_found = bot.find_game()
