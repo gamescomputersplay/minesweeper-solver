@@ -521,6 +521,18 @@ class MinesweeperSolver:
                 if neighbors in self.probability:
                     self.probability[neighbors].frontier += 1
 
+    def calculate_next_safe_csp(self):
+        ''' Populate "next safe" information (how many guaranteed safe cells
+        will be in the next move, based on CSP solutions).
+        '''
+        # Do the calculations
+        self.all_clusters.calculate_all_next_safe()
+
+        # Populate probability object with this info
+        for cluster in self.all_clusters.clusters:
+            for cell, next_safe in cluster.next_safe.items():
+                self.probability[cell].next_safe = next_safe
+
 
     @staticmethod
     def pick_a_random_cell(cells):
@@ -581,6 +593,8 @@ class MinesweeperSolver:
         self.calculate_opening_chances()
         # Calculate frontier values
         self.calculate_frontier()
+        # Calculate safe cells for teh next move in CSP
+        self.calculate_next_safe_csp()
 
         # Get cells that is least likely a mine
         lucky_cells = \
@@ -607,9 +621,9 @@ def main():
 
     settings = mg.GAME_TEST
     settings = mg.GAME_BEGINNER
-    settings = mg.GAME_EXPERT
+    #settings = mg.GAME_EXPERT
 
-    game = mg.MinesweeperGame(settings, seed=1)
+    game = mg.MinesweeperGame(settings, seed=0)
     solver = MinesweeperSolver(settings)
 
     while game.status == mg.STATUS_ALIVE:
