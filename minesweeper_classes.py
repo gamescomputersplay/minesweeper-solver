@@ -410,26 +410,49 @@ class GroupCluster:
         ''' Populate self.next_safe, how many guaranteed safe cells
         will be there next move, after clicking this cell.
         '''
-        #print ("!")
-        #print (self.cells)
-        #for solution in self.solutions:
-        #    print (solution)
+        # Result will be here as {cell: next_safe_count}
         next_safe = {}
-        for position, cell in enumerate(self.cells):
-            # List of potentially safe cells. We will knock off those with mines
-            # in solutions
-            candidates = [True for _ in range(len(self.cells))]
-            for solution in self.solutions:
-                # Iin this solution the cell is mine - skip
-                if solution[position]:
+
+        # Go through all cells, we'll calculate next_safe for each
+        for next_cell_position, next_cell in enumerate(self.cells):
+            # Counter of next_safe
+            next_safe_counter = 0
+
+            # Go through all cells
+            for position, _ in enumerate(self.cells):
+                # Ignore itself (the cell we are counting the next_safe_for)
+                if position == next_cell_position:
                     continue
-                # GO through the solution and mark false all positions that still
-                # have mines
-                for position_in_solution, has_mine in enumerate(solution):
-                    if candidates[position_in_solution] and has_mine:
-                        candidates[position_in_solution] = False
-            #print ("Candidates", candidates, candidates.count(True) - 1)
-            next_safe[cell] = candidates.count(True) - 1
+                # Now look at all solutions
+                for solution in self.solutions:
+                    # Skip the solutions where next_cell is a mine
+                    if solution[next_cell_position]:
+                        continue
+                    # If any solution has a mine in "position" -
+                    # it will not be safe in the next move
+                    if solution[position]:
+                        break
+                # But if you went through all solutions and all of them are safe:
+                # this is the a cell that will be safe next move
+                else:
+                    next_safe_counter += 1
+            # After looking at all positions we have the final count
+            next_safe[next_cell] = next_safe_counter
+
+            # # List of potentially safe cells. We will knock off those with mines
+            # # in solutions
+            # candidates = [True for _ in range(len(self.cells))]
+            # for solution in self.solutions:
+            #     # Iin this solution the cell is mine - skip
+            #     if solution[position]:
+            #         continue
+            #     # GO through the solution and mark false all positions that still
+            #     # have mines
+            #     for position_in_solution, has_mine in enumerate(solution):
+            #         if candidates[position_in_solution] and has_mine:
+            #             candidates[position_in_solution] = False
+            # #print ("Candidates", candidates, candidates.count(True) - 1)
+            # next_safe[cell] = candidates.count(True) - 1
 
         #print (next_safe)
         self.next_safe = next_safe
@@ -862,7 +885,8 @@ class AllProbabilities(dict):
             return overall_survival
 
         # Copy the info into a list, so we can just sort it
-        cells = [(cell, cell_info.mine_chance, cell_info.opening_chance, cell_info.frontier, cell_info.next_safe)
+        cells = [(cell, cell_info.mine_chance, cell_info.opening_chance,
+                  cell_info.frontier, cell_info.next_safe)
                  for cell, cell_info in self.items()]
 
         # Sort by 1. mine chance 2. frontier and opening chance.
