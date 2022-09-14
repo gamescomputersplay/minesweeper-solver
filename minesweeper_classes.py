@@ -439,22 +439,6 @@ class GroupCluster:
             # After looking at all positions we have the final count
             next_safe[next_cell] = next_safe_counter
 
-            # # List of potentially safe cells. We will knock off those with mines
-            # # in solutions
-            # candidates = [True for _ in range(len(self.cells))]
-            # for solution in self.solutions:
-            #     # Iin this solution the cell is mine - skip
-            #     if solution[position]:
-            #         continue
-            #     # GO through the solution and mark false all positions that still
-            #     # have mines
-            #     for position_in_solution, has_mine in enumerate(solution):
-            #         if candidates[position_in_solution] and has_mine:
-            #             candidates[position_in_solution] = False
-            # #print ("Candidates", candidates, candidates.count(True) - 1)
-            # next_safe[cell] = candidates.count(True) - 1
-
-        #print (next_safe)
         self.next_safe = next_safe
 
     def safe_cells(self):
@@ -904,6 +888,14 @@ class AllProbabilities(dict):
 
         # Pick 5 or fewer cells to look into 2nd move chances
         cells_for_recursion = cells[:5]
+
+        # If all the top cells are from the leftover part:
+        # do not do recursion, use simple probability
+        for cell, _, _, _, _ in cells_for_recursion:
+            if cell not in clusters.leftover_cells:
+                break
+        else:
+            return simple_best_probability()
 
         # Make a copy of the solver (so not to regenerate helpers)
         new_solver = original_solver.copy()
