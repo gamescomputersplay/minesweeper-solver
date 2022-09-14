@@ -47,7 +47,9 @@ class MinesweeperBotSettings():
         # Pause after a click (to give game  time to react)
         self.click_pause = click_pause
 
-
+# Settings for classic minesweeper versions
+# (2000s, XPs, MInesweeper X, Vienna, Arbiter)
+# Note, it is calibrated for 100% screen scale, will not work at 125% or others
 SETTINGS_MINESWEEPER_CLASSIC = MinesweeperBotSettings(
     field_color=[(192, 192, 192), (192, 192, 192, 255)],
     samples_files={
@@ -79,11 +81,20 @@ SETTINGS_MINESWEEPER_4D = MinesweeperBotSettings(
         "samples/4d-3-a.png": 3,
         "samples/4d-3-b.png": 3,
         "samples/4d-4-a.png": 4,
+        "samples/4d-4-b.png": 4,
         "samples/4d-5-a.png": 5,
+        "samples/4d-5-b.png": 5,
         "samples/4d-6-a.png": 6,
+        "samples/4d-7-a.png": 7,
+        "samples/4d-7-b.png": 7,
+        "samples/4d-8-a.png": 8,
+        "samples/4d-9-a.png": 9,
+        "samples/4d-10-a.png": 10,
+        "samples/4d-11-a.png": 11,
 
         "samples/4d-flag-a.png": mg.CELL_MINE,
         "samples/4d-flag-b.png": mg.CELL_MINE,
+        "samples/4d-mine-a.png": mg.CELL_MINE,
         "samples/4d-false-a.png": mg.CELL_FALSE_MINE,
         "samples/4d-covered.png": mg.CELL_COVERED,
         "samples/4d-explosion.png": mg.CELL_EXPLODED_MINE,
@@ -99,7 +110,7 @@ class MinesweeperBot:
     read the cells' values, click and so on
     '''
 
-    def __init__(self, settings=SETTINGS_MINESWEEPER_CLASSIC, mines=None):
+    def __init__(self, settings=SETTINGS_MINESWEEPER_CLASSIC, mines=None, is_4d=False):
         ''' IN:
                 - settings: a MinesweeperBotSettings with color settings to read
                 the field from the screenshot
@@ -115,6 +126,9 @@ class MinesweeperBot:
         # Number of mines in a game (Tries to guess, if it is one of
         # a standard 2D sizes, but otherwise has to be set up manually)
         self.game_mines = mines
+
+        # Is it the 4D minesweeper version that you can find on Steam?
+        self.is_4d = is_4d
 
         # Coordinates of the game on the screen
         self.cells_coordinates = None
@@ -318,8 +332,16 @@ class MinesweeperBot:
         # Sort them into rows and columns, store it in self.cells_coordinates
         self.cells_coordinates = arrange_cells(found)
 
+        # If it is a 4D game, override the settings we use to initiate solver
+        # It only works for perfectly square games
+        # (all 4 dimensions have to be  equal)
+        if self.is_4d:
+            field_side = int(math.sqrt(self.game_shape[0]))
+            shape_4d = tuple(field_side for _ in range(4))
+            settings = mg.GameSettings(shape_4d, self.game_mines)
+        else:
+            settings = mg.GameSettings(self.game_shape, self.game_mines)
         # Initiate solver
-        settings = mg.GameSettings(self.game_shape, self.game_mines)
         self.solver = ms.MinesweeperSolver(settings)
 
         return True
@@ -408,11 +430,21 @@ class MinesweeperBot:
     def do_clicks(self, safe, mines):
         '''Given the safe and mines coordinates, do the clicks
         '''
-        for button, coord_list in zip(("left", "right"), (safe, mines)):
+        for button, coord_list in zip(("right", "left"), (mines, safe)):
             if not coord_list:
                 continue
             for coord in coord_list:
-                left, top, right, bottom = self.cells_coordinates[coord]
+
+                if self.is_4d:
+                    x_4d, y_4d, z_4d, w_4d = coord
+                    field_side = int(math.sqrt(self.game_shape[0]))
+                    # This part is a mess, but whatever bugs there are, they
+                    # seem to have cancelled each other out, so it works
+                    x_2d = y_4d * field_side + w_4d
+                    y_2d = x_4d * field_side + z_4d
+                    left, top, right, bottom = self.cells_coordinates[x_2d, y_2d]
+                else:
+                    left, top, right, bottom = self.cells_coordinates[coord]
                 x_coord = (left + right) // 2
                 y_coord = (top + bottom) // 2
                 pyautogui.click(x_coord, y_coord, button=button)
@@ -459,8 +491,6 @@ class MinesweeperBot:
 
         # Read the field
         field = self.read_field(screenshot)
-        #game = mg.MinesweeperGame()
-        #print(game.field2str(field))
 
         # Check if the game is over, obe way or another
         if self.is_dead(field):
@@ -471,6 +501,14 @@ class MinesweeperBot:
             log_field(field)
             self.bot_stat.add_game(mg.STATUS_WON)
             return mg.STATUS_WON
+
+        # For 4D Game: do the transformation for teh solver
+        if self.is_4d:
+            field = self.transform_to_4d(field)
+
+        # Print out what we have read (for debugging)
+        # game = mg.MinesweeperGame()
+        # print(game.field2str(field))
 
         # Get the solution to the current field
         safe, mines = self.solver.solve(field)
@@ -491,12 +529,12 @@ class MinesweeperBot:
         return mg.STATUS_ALIVE
 
 
-def use_bot(games_to_play=100):
+def use_bot(games_to_play=100, settings=SETTINGS_MINESWEEPER_CLASSIC, mines=None, is_4d=None):
     ''' Play several games
     '''
 
     # Create a new bot object
-    bot = MinesweeperBot(SETTINGS_MINESWEEPER_CLASSIC)
+    bot = MinesweeperBot(settings=settings, mines=mines, is_4d=is_4d)
 
     # Find the game on the screen
     game_found = bot.find_game()
@@ -544,7 +582,11 @@ def use_bot(games_to_play=100):
 def main():
     '''Run the bot program
     '''
-    use_bot(10)
+    # Playing regular classic minesweeper
+    #use_bot(10)
+
+    # Playing 4D Steam Minesweeper
+    use_bot(1, settings=SETTINGS_MINESWEEPER_4D, mines=20, is_4d=True)
 
 if __name__ == "__main__":
     start = time.time()
