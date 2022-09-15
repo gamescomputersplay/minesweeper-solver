@@ -875,7 +875,12 @@ class AllProbabilities(dict):
 
         # Sort by 1. mine chance 2. frontier and opening chance.
         # Put the best in the beginning
-        cells.sort(key=lambda x: (x[1], -x[2], -x[4], -x[3]))
+        # cells.sort(key=lambda x: (x[1], -x[2], -x[4], -x[3])) # 38.0 / 38.7 wo skip leftovers
+        # cells.sort(key=lambda x: (x[1], -x[3], -x[2], -x[4])) # 39.5
+        # cells.sort(key=lambda x: (x[1], -x[4], -x[2], -x[3])) # 38.7
+        # Best order is: chance, frontier, next_safe, opening
+        cells.sort(key=lambda x: (x[1], -x[3], -x[4], -x[2])) # 39.6 / 40.7 without "skip leftover"
+        # cells.sort(key=lambda x: (x[1], -x[4], -x[3], -x[2])) # 39.3
 
         # End of recursion, don't go deeper
         # Just return all cells with best mine and open chances
@@ -891,35 +896,37 @@ class AllProbabilities(dict):
 
         # If all the top cells are from the leftover part:
         # do not do recursion, use simple probability
-        for cell, _, _, _, _ in cells_for_recursion:
-            if cell not in clusters.leftover_cells:
-                break
-        else:
-            return simple_best_probability()
+        # for cell, _, _, _, _ in cells_for_recursion:
+        #     if cell not in clusters.leftover_cells:
+        #         break
+        # else:
+        #     return simple_best_probability()
 
         # Make a copy of the solver (so not to regenerate helpers)
         new_solver = original_solver.copy()
 
         # Calculate probable number of mines in those cells
         cells_with_next_move = []
-        for cell, chance, opening, _, next_safe in cells_for_recursion:
+        for cell, chance, opening, frontier, next_safe in cells_for_recursion:
 
             # Calculate survival rate (both click alive) for this cell
             next_move_survival = calculate_next_move_survival(cell)
 
             # Add this information to the cells_with_next_move list
             cells_with_next_move.append((cell, chance, opening,
-                                         next_move_survival, next_safe))
+                                         next_move_survival, frontier, next_safe))
 
-        # Sort it by 2nd round survival and opening chance
-        cells_with_next_move.sort(key=lambda x: (-x[3], -x[4], x[1], -x[2]))
+        # Sort it by: surv, next_safe,, chance, opening
+        cells_with_next_move.sort(key=lambda x: (-x[3], -x[5], x[1], -x[2]))
+        # Try surv, frontier, next_safe, opening
+        # cells_with_next_move.sort(key=lambda x: (-x[3], -x[4], -x[5], -x[2], x[1]))
 
         # This is the best 2-step survival
-        _, _, best_opening, best_survival, best_next_safe = cells_with_next_move[0]
+        _, _, best_opening, best_survival, best_frontier, best_next_safe = cells_with_next_move[0]
 
         # Pick cells with the best survival and opening chances
         cells_best_survival = []
-        for cell, chance, opening, survival, next_safe in cells_with_next_move:
+        for cell, chance, opening, survival, frontier, next_safe in cells_with_next_move:
             if survival == best_survival and \
                opening == best_opening and \
                next_safe == best_next_safe:
