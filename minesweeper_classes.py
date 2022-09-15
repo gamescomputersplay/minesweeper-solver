@@ -432,7 +432,7 @@ class GroupCluster:
                     # it will not be safe in the next move
                     if solution[position]:
                         break
-                # But if you went through all solutions and all of them are safe:
+                # But if you went through all solutions and all are safe:
                 # this is the a cell that will be safe next move
                 else:
                     next_safe_counter += 1
@@ -452,17 +452,6 @@ class GroupCluster:
         '''
         mines = [cell for cell, freq in self.frequencies.items() if freq == 1]
         return mines
-
-    def calculate_hash(self):
-        ''' Hash of a cluster. To check if we already dealt with this one
-        '''
-        # Prepare data for hashing: sort cells, add number of groups
-        # (should be enough to identify a cluster)
-        for_hash = sorted(list(self.cells_set)) + [len(self.groups)]
-        # Make immutable
-        for_hash = tuple(for_hash)
-        # Return hash
-        return hash(for_hash)
 
     def calculate_solution_weights(self, covered_cells, remaining_mines):
         ''' Calculate how probable each solution  is,
@@ -557,11 +546,6 @@ class AllClusters:
         # List of all clusters
         self.clusters = []
 
-        # History of clusters we already processed, so we won't have to
-        # solved them again (they can be quite time consuming)
-        # Also used to cache mine counts, {hash_value: mine_count}
-        self.clusters_history = {}
-
         # Cells that are not in any cluster
         self.leftover_cells = set()
 
@@ -580,19 +564,9 @@ class AllClusters:
 
     def calculate_all(self):
         '''Perform all cluster-related calculations: solve clusters,
-        calculate weights and mine frequencies etc. Check the history
-        in case this cluster was already solved
+        calculate weights and mine frequencies etc.
         '''
         for cluster in self.clusters:
-
-            # Cluster deduplication. If we solved this cluster already, ignore
-            # it, but get the probable mines  from the "cache" - we'll need it
-            # for probability method
-            if cluster.calculate_hash() in self.clusters_history:
-                cluster.probable_mines, cluster.solutions, \
-                    cluster.solution_weights = \
-                    self.clusters_history[cluster.calculate_hash()]
-                continue
 
             # Solve the cluster, including weights,
             # frequencies and probable mines
@@ -601,11 +575,6 @@ class AllClusters:
                                                self.remaining_mines)
             cluster.calculate_frequencies()
             cluster.possible_mine_counts()
-
-            # Save cluster's hash in history for deduplication
-            self.clusters_history[cluster.calculate_hash()] = \
-                (cluster.probable_mines,
-                 cluster.solutions, cluster.solution_weights)
 
     def calculate_leftovers(self):
         '''Based on clusters, calculate mines and probabilities in cells
@@ -786,6 +755,7 @@ class CellProbability:
     # cell is clicked (based on CSP clusters)
     next_safe: int = 0
 
+
 class AllProbabilities(dict):
     '''Class to work with probability-based information about cells
     '''
@@ -815,11 +785,13 @@ class AllProbabilities(dict):
             Return a list if several.
             '''
             # This is the best chances
-            _, best_mine_chance, best_opening_chance, best_frontier, best_next_safe = cells[0]
+            _, best_mine_chance, best_opening_chance, \
+                best_frontier, best_next_safe = cells[0]
 
             # Pick cells with the best probability and opening chances
             cells_best_chances = []
-            for cell, mine_chance, opening_chance, frontier, next_safe in cells:
+            for cell, mine_chance, opening_chance, \
+                    frontier, next_safe in cells:
                 if mine_chance == best_mine_chance and \
                    opening_chance == best_opening_chance and \
                    next_safe == best_next_safe and \
@@ -873,14 +845,8 @@ class AllProbabilities(dict):
                   cell_info.frontier, cell_info.next_safe)
                  for cell, cell_info in self.items()]
 
-        # Sort by 1. mine chance 2. frontier and opening chance.
-        # Put the best in the beginning
-        # cells.sort(key=lambda x: (x[1], -x[2], -x[4], -x[3])) # 38.0 / 38.7 wo skip leftovers
-        # cells.sort(key=lambda x: (x[1], -x[3], -x[2], -x[4])) # 39.5
-        # cells.sort(key=lambda x: (x[1], -x[4], -x[2], -x[3])) # 38.7
-        # Best order is: chance, frontier, next_safe, opening
-        cells.sort(key=lambda x: (x[1], -x[3], -x[4], -x[2])) # 39.6 / 40.7 without "skip leftover"
-        # cells.sort(key=lambda x: (x[1], -x[4], -x[3], -x[2])) # 39.3
+        # Best sorting order is: chance, frontier, next_safe, opening
+        cells.sort(key=lambda x: (x[1], -x[3], -x[4], -x[2]))
 
         # End of recursion, don't go deeper
         # Just return all cells with best mine and open chances
@@ -894,14 +860,6 @@ class AllProbabilities(dict):
         # Pick 5 or fewer cells to look into 2nd move chances
         cells_for_recursion = cells[:5]
 
-        # If all the top cells are from the leftover part:
-        # do not do recursion, use simple probability
-        # for cell, _, _, _, _ in cells_for_recursion:
-        #     if cell not in clusters.leftover_cells:
-        #         break
-        # else:
-        #     return simple_best_probability()
-
         # Make a copy of the solver (so not to regenerate helpers)
         new_solver = original_solver.copy()
 
@@ -914,19 +872,20 @@ class AllProbabilities(dict):
 
             # Add this information to the cells_with_next_move list
             cells_with_next_move.append((cell, chance, opening,
-                                         next_move_survival, frontier, next_safe))
+                                         next_move_survival, frontier,
+                                         next_safe))
 
-        # Sort it by: surv, next_safe,, chance, opening
+        # Sort it by: survival, next_safe,, chance, opening
         cells_with_next_move.sort(key=lambda x: (-x[3], -x[5], x[1], -x[2]))
-        # Try surv, frontier, next_safe, opening
-        # cells_with_next_move.sort(key=lambda x: (-x[3], -x[4], -x[5], -x[2], x[1]))
 
         # This is the best 2-step survival
-        _, _, best_opening, best_survival, best_frontier, best_next_safe = cells_with_next_move[0]
+        _, _, best_opening, best_survival, _, best_next_safe = \
+            cells_with_next_move[0]
 
         # Pick cells with the best survival and opening chances
         cells_best_survival = []
-        for cell, chance, opening, survival, frontier, next_safe in cells_with_next_move:
+        for cell, chance, opening, survival, _, next_safe \
+                in cells_with_next_move:
             if survival == best_survival and \
                opening == best_opening and \
                next_safe == best_next_safe:

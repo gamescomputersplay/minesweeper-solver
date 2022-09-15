@@ -533,7 +533,6 @@ class MinesweeperSolver:
             for cell, next_safe in cluster.next_safe.items():
                 self.probability[cell].next_safe = next_safe
 
-
     @staticmethod
     def pick_a_random_cell(cells):
         '''Pick a random cell out of the list of cells.
@@ -621,7 +620,7 @@ def main():
 
     settings = mg.GAME_TEST
     settings = mg.GAME_BEGINNER
-    #settings = mg.GAME_EXPERT
+    # settings = mg.GAME_EXPERT
 
     game = mg.MinesweeperGame(settings, seed=0)
     solver = MinesweeperSolver(settings)
