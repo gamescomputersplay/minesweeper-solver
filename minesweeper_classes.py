@@ -762,6 +762,8 @@ class CellProbability:
     # through solving the field with this cell opened)
     next_move_survival: float = 0
 
+    # Has this mine been shortlisted (selected for the 2nd move survival test)
+    shortlisted: int = 0
 
 class AllProbabilities():
     '''Class to work with probability-based information about cells
@@ -887,8 +889,13 @@ class AllProbabilities():
             # Add this information to the cells_with_next_move list
             probability_info.next_move_survival = next_move_survival
 
+            # Mark that this is one of the "shortlisted cells"
+            probability_info.shortlisted = 1
+            #print(cell, next_move_survival)
+
         # Sort it by: survival, next_safe,, chance, opening
-        self.cells_list.sort(key=lambda x: (-x.next_move_survival,
+        self.cells_list.sort(key=lambda x: (-x.shortlisted,
+                                            -x.next_move_survival,
                                             -x.next_safe, x.mine_chance,
                                             -x.opening_chance))
 
@@ -896,15 +903,17 @@ class AllProbabilities():
         best_survival = self.cells_list[0].next_move_survival
         best_opening_chance = self.cells_list[0].opening_chance
         best_next_safe = self.cells_list[0].next_safe
+        is_shortlisted = self.cells_list[0].shortlisted
 
         # Pick cells that are as good as the best cell
         best_cells = []
         for probability_info in self.cells_list:
             if probability_info.next_move_survival == best_survival and \
                 probability_info.opening_chance == best_opening_chance and \
-                probability_info.next_safe == best_next_safe:
+                probability_info.next_safe == best_next_safe and \
+                probability_info.shortlisted == is_shortlisted:
                 best_cells.append(probability_info.cell)
-
+        #print(best_cells)
         return best_cells
 
 
