@@ -864,8 +864,9 @@ class AllProbabilities():
         self.cells_list = list(self.cells.values())
 
         # Sort the cells by: chance, opening, frontier, next_safe
-        self.cells_list.sort(key=lambda x: (x.mine_chance, -x.opening_chance,
-                                            -x.frontier, -x.next_safe))
+        self.cells_list.sort(key=lambda x: (-x.mine_chance, x.opening_chance,
+                                            x.frontier, x.next_safe),
+                             reverse=True)
 
         # End of recursion, don't go deeper
         # Just return all cells with best mine and open chances
@@ -894,10 +895,11 @@ class AllProbabilities():
             #print(cell, next_move_survival)
 
         # Sort it by: survival, next_safe,, chance, opening
-        self.cells_list.sort(key=lambda x: (-x.shortlisted,
-                                            -x.next_move_survival,
-                                            -x.next_safe, x.mine_chance,
-                                            -x.opening_chance))
+        self.cells_list.sort(key=lambda x: (x.shortlisted,
+                                            x.next_move_survival,
+                                            x.next_safe, -x.mine_chance,
+                                            x.opening_chance),
+                             reverse=True)
 
         # This is the best cell
         best_survival = self.cells_list[0].next_move_survival
