@@ -903,6 +903,7 @@ class AllProbabilities():
         best_survival = self.cells_list[0].next_move_survival
         best_opening_chance = self.cells_list[0].opening_chance
         best_next_safe = self.cells_list[0].next_safe
+        best_mine_chance = self.cells_list[0].mine_chance
         is_shortlisted = self.cells_list[0].shortlisted
 
         # Pick cells that are as good as the best cell
@@ -910,6 +911,7 @@ class AllProbabilities():
         for probability_info in self.cells_list:
             if probability_info.next_move_survival == best_survival and \
                 probability_info.opening_chance == best_opening_chance and \
+                probability_info.mine_chance == best_mine_chance and \
                 probability_info.next_safe == best_next_safe and \
                 probability_info.shortlisted == is_shortlisted:
                 best_cells.append(probability_info.cell)
