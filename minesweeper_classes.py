@@ -846,7 +846,7 @@ class AllProbabilities(dict):
                  for cell, cell_info in self.items()]
 
         # Best sorting order is: chance, frontier, next_safe, opening
-        cells.sort(key=lambda x: (x[1], -x[3], -x[4], -x[2]))
+        cells.sort(key=lambda x: (x[1], -x[2], -x[3], -x[4]))
 
         # End of recursion, don't go deeper
         # Just return all cells with best mine and open chances
