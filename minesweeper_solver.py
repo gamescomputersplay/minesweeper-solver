@@ -429,9 +429,9 @@ class MinesweeperSolver:
                 self.remaining_mines / len(self.covered_cells)
 
             for cell in self.covered_cells:
-                self.probability[cell] = \
-                    mc.CellProbability(background_probability,
-                                       "Background")
+                self.probability.cells[cell] = \
+                    mc.CellProbability(cell, "Background",
+                                       background_probability)
 
         def probabilities_for_groups(self):
             ''' Update self.probabilities, based on mine groups.
@@ -447,9 +447,9 @@ class MinesweeperSolver:
                     # If group's probability is higher than the background:
                     # Overwrite the probability result
                     if group_probability > \
-                       self.probability[cell].mine_chance:
-                        self.probability[cell] = \
-                            mc.CellProbability(group_probability, "Groups")
+                       self.probability.cells[cell].mine_chance:
+                        self.probability.cells[cell] = \
+                            mc.CellProbability(cell, "Groups", group_probability)
 
         def csp_probabilities(self):
             ''' Update self.probabilities based on results from CSP method.
@@ -457,8 +457,8 @@ class MinesweeperSolver:
             for cluster in self.all_clusters.clusters:
                 for cell, frequency in cluster.frequencies.items():
                     # Overwrite the probability result
-                    self.probability[cell] = \
-                        mc.CellProbability(frequency, "CSP")
+                    self.probability.cells[cell] = \
+                        mc.CellProbability(cell, "CSP", frequency)
 
         def cluster_leftovers_probabilities(self):
             ''' Update self.probabilities based on "leftovers",
@@ -474,9 +474,9 @@ class MinesweeperSolver:
 
             # Fill in the probabilities
             for cell in self.all_clusters.leftover_cells:
-                self.probability[cell] = \
-                    mc.CellProbability(self.all_clusters.leftover_mine_chance,
-                                       "CSP Leftovers")
+                self.probability.cells[cell] = \
+                    mc.CellProbability(cell, "CSP Leftovers",
+                                       self.all_clusters.leftover_mine_chance)
 
         # Reset probabilities
         self.probability = mc.AllProbabilities()
@@ -495,7 +495,7 @@ class MinesweeperSolver:
         '''
         # Go through all cells we have probability info for
         # (that would be all covered cells)
-        for cell, cell_info in self.probability.items():
+        for cell, cell_info in self.probability.cells.items():
             zero_chance = 1
             # Look at neighbors of each cell
             for neighbor in self.helper.cell_surroundings(cell):
@@ -505,10 +505,10 @@ class MinesweeperSolver:
                     break
                 # Otherwise each mine chance decrease opening chance
                 # by (1 - mine chance) times
-                if neighbor in self.probability:
-                    zero_chance *= (1 - self.probability[neighbor].mine_chance)
+                if neighbor in self.probability.cells:
+                    zero_chance *= (1 - self.probability.cells[neighbor].mine_chance)
             else:
-                self.probability[cell].opening_chance = zero_chance
+                self.probability.cells[cell].opening_chance = zero_chance
 
     def calculate_frontier(self):
         ''' Populate frontier (how many groups may be affected by this cell)
@@ -518,9 +518,20 @@ class MinesweeperSolver:
 
         for cell in self.groups.frontier:
             for neighbors in self.helper.cell_surroundings(cell):
-                if neighbors in self.probability:
-                    self.probability[neighbors].frontier += 1
+                if neighbors in self.probability.cells:
+                    self.probability.cells[neighbors].frontier += 1
 
+    def calculate_next_safe_csp(self):
+        ''' Populate "next safe" information (how many guaranteed safe cells
+        will be in the next move, based on CSP solutions).
+        '''
+        # Do the calculations
+        self.all_clusters.calculate_all_next_safe()
+
+        # Populate probability object with this info
+        for cluster in self.all_clusters.clusters:
+            for cell, next_safe in cluster.next_safe.items():
+                self.probability.cells[cell].next_safe = next_safe
 
     @staticmethod
     def pick_a_random_cell(cells):
@@ -581,6 +592,8 @@ class MinesweeperSolver:
         self.calculate_opening_chances()
         # Calculate frontier values
         self.calculate_frontier()
+        # Calculate safe cells for teh next move in CSP
+        self.calculate_next_safe_csp()
 
         # Get cells that is least likely a mine
         lucky_cells = \
@@ -592,8 +605,8 @@ class MinesweeperSolver:
             # Store information about expected chance of mine and how
             # this chance was calculated
             self.last_move_info = ("Probability",
-                                   self.probability[lucky_cell].source,
-                                   self.probability[lucky_cell].mine_chance)
+                                   self.probability.cells[lucky_cell].source,
+                                   self.probability.cells[lucky_cell].mine_chance)
             return [lucky_cell, ], None
 
         # This should not happen, but here's a catch-all if it does
@@ -607,14 +620,14 @@ def main():
 
     settings = mg.GAME_TEST
     settings = mg.GAME_BEGINNER
-    settings = mg.GAME_EXPERT
+    # settings = mg.GAME_EXPERT
 
-    game = mg.MinesweeperGame(settings, seed=1)
+    game = mg.MinesweeperGame(settings, seed=0)
     solver = MinesweeperSolver(settings)
 
     while game.status == mg.STATUS_ALIVE:
 
-        safe, mines = solver.solve(game.uncovered, next_moves=0)
+        safe, mines = solver.solve(game.uncovered, next_moves=1)
         method, random_method, chance = solver.last_move_info
 
         chance_str, random_method_str = "", ""

@@ -326,7 +326,7 @@ class MinesweeperSim:
         '''
         # Choose if we need to display a progress bar
         if USE_PROGRESS_BAR:
-            iterator = tqdm(range(self.runs), leave=False)
+            iterator = tqdm(range(self.runs), leave=False, smoothing=0)
         else:
             iterator = range(self.runs)
 
@@ -379,7 +379,7 @@ def main():
     seed = 0
 
     # games to simulate
-    runs = 1000
+    runs = 100
 
     # All popular minesweeper and multidimensional minesweeper presets
     presets = (mg.GAME_BEGINNER, mg.GAME_INTERMEDIATE, mg.GAME_EXPERT,

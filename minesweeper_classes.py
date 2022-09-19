@@ -232,6 +232,11 @@ class GroupCluster:
         # Dict of possible mine counts {mines: mine_count, ...}
         self.probable_mines = {}
 
+        # Dict that holds information about "next safe" cells. How many
+        # guaranteed safe cells will be in the cluster if "cell" is
+        # clicked (and discovered to be safe)
+        self.next_safe = {}
+
     def add_group(self, group):
         ''' Adding group to a cluster (assume they overlap).
         Add group's cells to the set of cells
@@ -401,6 +406,41 @@ class GroupCluster:
             else:
                 self.frequencies[cell] = 0
 
+    def calculate_next_safe(self):
+        ''' Populate self.next_safe, how many guaranteed safe cells
+        will be there next move, after clicking this cell.
+        '''
+        # Result will be here as {cell: next_safe_count}
+        next_safe = {}
+
+        # Go through all cells, we'll calculate next_safe for each
+        for next_cell_position, next_cell in enumerate(self.cells):
+            # Counter of next_safe
+            next_safe_counter = 0
+
+            # Go through all cells
+            for position, _ in enumerate(self.cells):
+                # Ignore itself (the cell we are counting the next_safe_for)
+                if position == next_cell_position:
+                    continue
+                # Now look at all solutions
+                for solution in self.solutions:
+                    # Skip the solutions where next_cell is a mine
+                    if solution[next_cell_position]:
+                        continue
+                    # If any solution has a mine in "position" -
+                    # it will not be safe in the next move
+                    if solution[position]:
+                        break
+                # But if you went through all solutions and all are safe:
+                # this is the a cell that will be safe next move
+                else:
+                    next_safe_counter += 1
+            # After looking at all positions we have the final count
+            next_safe[next_cell] = next_safe_counter
+
+        self.next_safe = next_safe
+
     def safe_cells(self):
         ''' Return list of guaranteed safe cells (0 in self.frequencies)
         '''
@@ -412,17 +452,6 @@ class GroupCluster:
         '''
         mines = [cell for cell, freq in self.frequencies.items() if freq == 1]
         return mines
-
-    def calculate_hash(self):
-        ''' Hash of a cluster. To check if we already dealt with this one
-        '''
-        # Prepare data for hashing: sort cells, add number of groups
-        # (should be enough to identify a cluster)
-        for_hash = sorted(list(self.cells_set)) + [len(self.groups)]
-        # Make immutable
-        for_hash = tuple(for_hash)
-        # Return hash
-        return hash(for_hash)
 
     def calculate_solution_weights(self, covered_cells, remaining_mines):
         ''' Calculate how probable each solution  is,
@@ -517,11 +546,6 @@ class AllClusters:
         # List of all clusters
         self.clusters = []
 
-        # History of clusters we already processed, so we won't have to
-        # solved them again (they can be quite time consuming)
-        # Also used to cache mine counts, {hash_value: mine_count}
-        self.clusters_history = {}
-
         # Cells that are not in any cluster
         self.leftover_cells = set()
 
@@ -540,19 +564,9 @@ class AllClusters:
 
     def calculate_all(self):
         '''Perform all cluster-related calculations: solve clusters,
-        calculate weights and mine frequencies etc. Check the history
-        in case this cluster was already solved
+        calculate weights and mine frequencies etc.
         '''
         for cluster in self.clusters:
-
-            # Cluster deduplication. If we solved this cluster already, ignore
-            # it, but get the probable mines  from the "cache" - we'll need it
-            # for probability method
-            if cluster.calculate_hash() in self.clusters_history:
-                cluster.probable_mines, cluster.solutions, \
-                    cluster.solution_weights = \
-                    self.clusters_history[cluster.calculate_hash()]
-                continue
 
             # Solve the cluster, including weights,
             # frequencies and probable mines
@@ -561,11 +575,6 @@ class AllClusters:
                                                self.remaining_mines)
             cluster.calculate_frequencies()
             cluster.possible_mine_counts()
-
-            # Save cluster's hash in history for deduplication
-            self.clusters_history[cluster.calculate_hash()] = \
-                (cluster.probable_mines,
-                 cluster.solutions, cluster.solution_weights)
 
     def calculate_leftovers(self):
         '''Based on clusters, calculate mines and probabilities in cells
@@ -640,6 +649,12 @@ class AllClusters:
 
         # And this is the probability of a mine in those cells
         self.leftover_mine_chance = leftover_mines / len(self.leftover_cells)
+
+    def calculate_all_next_safe(self):
+        ''' Calculate and populate "next_safe" information for each cluster
+        '''
+        for cluster in self.clusters:
+            cluster.calculate_next_safe()
 
     def mines_in_leftover_part(self, cell_count):
         ''' If we take several cells (cell_count) in leftover area.
@@ -724,18 +739,43 @@ class AllClusters:
 class CellProbability:
     ''' Data about mine probability for one cell
     '''
-    # Chance this cell is a mine (0 to 1)
-    mine_chance: float
+    # Which cell we are talking about (coordinates)
+    cell: tuple
+
     # Which method was used to generate mine chance (for statistics)
     source: str
+
+    # Chance this cell is a mine (0 to 1)
+    mine_chance: float
+
     # Chance it would be an opening (no mines in surrounding cells)
     opening_chance: float = 0
+
     # Frontier value: how many groups is this cell a part of
     frontier: int = 0
 
-class AllProbabilities(dict):
+    # How many guaranteed safe cells are there for the next move, if this
+    # cell is clicked (based on CSP clusters)
+    next_safe: int = 0
+
+    # Survival chance after this move and the next (calculated by going
+    # through solving the field with this cell opened)
+    next_move_survival: float = 0
+
+    # Has this mine been shortlisted (selected for the 2nd move survival test)
+    shortlisted: int = 0
+
+class AllProbabilities():
     '''Class to work with probability-based information about cells
+    Based on list (a list of CellProbability objects)
     '''
+
+    def __init__(self):
+        # Dict of AllProbabilities
+        self.cells = {}
+        # Same, but list (it is easier to collect data into the dict,
+        # buts I will need to sort it, so I will convert it into the list)
+        self.cells_list = []
 
     @staticmethod
     def current_found_mines(helper, field, cell):
@@ -761,19 +801,24 @@ class AllProbabilities(dict):
             just pick lowest mine chance with highest opening chance.
             Return a list if several.
             '''
-            # This is the best chances
-            _, best_mine_chance, best_opening_chance, best_frontier = cells[0]
+            # The self array of probabilities is sorted, so so the 0's
+            # element has the best set of all parameters
 
-            # Pick cells with the best probability and opening chances
-            cells_best_chances = []
-            for cell, mine_chance, opening_chance, frontier in cells:
-                if mine_chance == best_mine_chance and \
-                   opening_chance == best_opening_chance and \
-                   frontier == best_frontier:
-                    cells_best_chances.append(cell)
+            best_mine_chance = self.cells_list[0].mine_chance
+            best_opening_chance = self.cells_list[0].opening_chance
+            best_frontier = self.cells_list[0].frontier
+            best_next_safe = self.cells_list[0].next_safe
 
-            # Return cells with lowest mine chance and highest open chance.
-            return cells_best_chances
+            # Pick cells with parameters as good as the best one
+            best_cells = []
+            for probability_info in self.cells_list:
+                if probability_info.mine_chance == best_mine_chance and \
+                   probability_info.opening_chance == best_opening_chance and \
+                   probability_info.frontier == best_frontier and \
+                   probability_info.next_safe == best_next_safe:
+                    best_cells.append(probability_info.cell)
+
+            return best_cells
 
         def calculate_next_move_survival(cell):
             ''' Calculate survival probability after the NEXT move,
@@ -806,7 +851,8 @@ class AllProbabilities(dict):
                 else:
                     next_mine_chance = 0
 
-                next_survival = (1 - chance) * (1 - next_mine_chance)
+                mine_chance = self.cells[cell].mine_chance
+                next_survival = (1 - mine_chance) * (1 - next_mine_chance)
 
                 # Overall survival is a sum of
                 # "survival if the cell is this number" * chance of this number
@@ -814,54 +860,65 @@ class AllProbabilities(dict):
 
             return overall_survival
 
-        # Copy the info into a list, so we can just sort it
-        cells = [(cell, cell_info.mine_chance, cell_info.opening_chance, cell_info.frontier)
-                 for cell, cell_info in self.items()]
+        # Convert dict into list, so we could sort it
+        self.cells_list = list(self.cells.values())
 
-        # Sort by 1. mine chance 2. frontier and opening chance.
-        # Put the best in the beginning
-        cells.sort(key=lambda x: (x[1], -x[2], -x[3]))
+        # Sort the cells by: chance, opening, frontier, next_safe
+        self.cells_list.sort(key=lambda x: (-x.mine_chance, x.opening_chance,
+                                            x.frontier, x.next_safe),
+                             reverse=True)
 
         # End of recursion, don't go deeper
         # Just return all cells with best mine and open chances
         if next_moves == 0:
-
             return simple_best_probability()
 
         # Keep recursion going: check what will be the mine chance for
         # the next move (Currently being implemented)
 
-        # Pick 5 or fewer cells to look into 2nd move chances
-        cells_for_recursion = cells[:5]
-
         # Make a copy of the solver (so not to regenerate helpers)
         new_solver = original_solver.copy()
 
         # Calculate probable number of mines in those cells
-        cells_with_next_move = []
-        for cell, chance, opening, _ in cells_for_recursion:
+        for probability_info in self.cells_list[:5]:
+
+            cell = probability_info.cell
 
             # Calculate survival rate (both click alive) for this cell
             next_move_survival = calculate_next_move_survival(cell)
 
             # Add this information to the cells_with_next_move list
-            cells_with_next_move.append((cell, chance, opening,
-                                         next_move_survival))
+            probability_info.next_move_survival = next_move_survival
 
-        # Sort it by 2nd round survival and opening chance
-        cells_with_next_move.sort(key=lambda x: (-x[3], x[1], -x[2]))
+            # Mark that this is one of the "shortlisted cells"
+            probability_info.shortlisted = 1
+            #print(cell, next_move_survival)
 
-        # This is the best 2-step survival
-        _, _, best_opening, best_survival = cells_with_next_move[0]
+        # Sort it by: survival, next_safe,, chance, opening
+        self.cells_list.sort(key=lambda x: (x.shortlisted,
+                                            x.next_move_survival,
+                                            x.next_safe, -x.mine_chance,
+                                            x.opening_chance),
+                             reverse=True)
 
-        # Pick cells with the best survival and opening chances
-        cells_best_survival = []
-        for cell, chance, opening, survival in cells_with_next_move:
-            if survival == best_survival and \
-               opening == best_opening:
-                cells_best_survival.append(cell)
+        # This is the best cell
+        best_survival = self.cells_list[0].next_move_survival
+        best_opening_chance = self.cells_list[0].opening_chance
+        best_next_safe = self.cells_list[0].next_safe
+        best_mine_chance = self.cells_list[0].mine_chance
+        is_shortlisted = self.cells_list[0].shortlisted
 
-        return cells_best_survival
+        # Pick cells that are as good as the best cell
+        best_cells = []
+        for probability_info in self.cells_list:
+            if probability_info.next_move_survival == best_survival and \
+                probability_info.opening_chance == best_opening_chance and \
+                probability_info.mine_chance == best_mine_chance and \
+                probability_info.next_safe == best_next_safe and \
+                probability_info.shortlisted == is_shortlisted:
+                best_cells.append(probability_info.cell)
+        #print(best_cells)
+        return best_cells
 
 
 def main():
