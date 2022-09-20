@@ -827,8 +827,14 @@ class AllProbabilities():
             probable_new_numbers = clusters.get_mines_chances(cell)
             # print (f"-- Probable mines: {probable_new_mines}")
 
-            # Now go through possible values for that cell
+            # Chance to survive over 2 moves
             overall_survival = 0
+            # Chance there is a deterministic result for the second move
+            overall_deterministic_chance = 0
+            # Expected count of deterministic cells for the second move
+            overall_deterministic_count = 0
+
+            # Now go through possible values for that cell
             for new_number, new_number_chance in probable_new_numbers.items():
                 # print(f"--- Start doing option: ({new_mines_count})")
                 # Copy of the current field
@@ -844,21 +850,27 @@ class AllProbabilities():
 
                 # Run the solver, pass in the updated field and decreased
                 # recursion value
-                new_solver.solve(new_field, next_moves - 1)
+                new_safe, new_mines = new_solver.solve(new_field, next_moves - 1)
 
+                # Calculate result for this number option in the cell
                 if new_solver.last_move_info[0] == "Probability":
                     next_mine_chance = new_solver.last_move_info[2]
+                    next_deterministic_count = 0
+                    next_deterministic_chance = 0
                 else:
                     next_mine_chance = 0
+                    next_deterministic_count = len(new_safe) + len(new_mines)
+                    next_deterministic_chance = 1
 
                 mine_chance = self.cells[cell].mine_chance
                 next_survival = (1 - mine_chance) * (1 - next_mine_chance)
 
-                # Overall survival is a sum of
-                # "survival if the cell is this number" * chance of this number
+                # Overall value is a sum of all values, weighted by possibility
                 overall_survival += next_survival * new_number_chance
+                overall_deterministic_count += next_deterministic_count * new_number_chance
+                overall_deterministic_chance += next_deterministic_chance * new_number_chance
 
-            return overall_survival
+            return overall_survival, overall_deterministic_count, overall_deterministic_chance
 
         # Convert dict into list, so we could sort it
         self.cells_list = list(self.cells.values())
@@ -885,7 +897,7 @@ class AllProbabilities():
             cell = probability_info.cell
 
             # Calculate survival rate (both click alive) for this cell
-            next_move_survival = calculate_next_move_survival(cell)
+            next_move_survival, _, _ = calculate_next_move_survival(cell)
 
             # Add this information to the cells_with_next_move list
             probability_info.next_move_survival = next_move_survival
