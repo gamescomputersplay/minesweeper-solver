@@ -756,14 +756,21 @@ class CellProbability:
 
     # How many guaranteed safe cells are there for the next move, if this
     # cell is clicked (based on CSP clusters)
-    next_safe: int = 0
+    csp_next_safe: int = 0
+
+    # Chance of having at least 1 safe (or mine) cell if this cell is clicked)
+    next_move_safe_chance: float = 0
+
+    # Expected number of safe cells for the next move
+    next_safe_count: float = 0
 
     # Survival chance after this move and the next (calculated by going
     # through solving the field with this cell opened)
-    next_move_survival: float = 0
+    next_survival: float = 0
 
     # Has this mine been shortlisted (selected for the 2nd move survival test)
     shortlisted: int = 0
+
 
 class AllProbabilities():
     '''Class to work with probability-based information about cells
@@ -807,7 +814,7 @@ class AllProbabilities():
             best_mine_chance = self.cells_list[0].mine_chance
             best_opening_chance = self.cells_list[0].opening_chance
             best_frontier = self.cells_list[0].frontier
-            best_next_safe = self.cells_list[0].next_safe
+            best_csp_next_safe = self.cells_list[0].csp_next_safe
 
             # Pick cells with parameters as good as the best one
             best_cells = []
@@ -815,7 +822,7 @@ class AllProbabilities():
                 if probability_info.mine_chance == best_mine_chance and \
                    probability_info.opening_chance == best_opening_chance and \
                    probability_info.frontier == best_frontier and \
-                   probability_info.next_safe == best_next_safe:
+                   probability_info.csp_next_safe == best_csp_next_safe:
                     best_cells.append(probability_info.cell)
 
             return best_cells
@@ -827,8 +834,12 @@ class AllProbabilities():
             probable_new_numbers = clusters.get_mines_chances(cell)
             # print (f"-- Probable mines: {probable_new_mines}")
 
-            # Now go through possible values for that cell
+            # Chance to survive over 2 moves
             overall_survival = 0
+            # Expected count of safe cells for the second move
+            overall_safe_count = 0
+
+            # Now go through possible values for that cell
             for new_number, new_number_chance in probable_new_numbers.items():
                 # print(f"--- Start doing option: ({new_mines_count})")
                 # Copy of the current field
@@ -844,28 +855,31 @@ class AllProbabilities():
 
                 # Run the solver, pass in the updated field and decreased
                 # recursion value
-                new_solver.solve(new_field, next_moves - 1)
+                new_safe, _ = new_solver.solve(new_field, next_moves - 1)
 
+                # Calculate result for this number option in the cell
                 if new_solver.last_move_info[0] == "Probability":
                     next_mine_chance = new_solver.last_move_info[2]
+                    next_safe_count = 0
                 else:
                     next_mine_chance = 0
+                    next_safe_count = len(new_safe)
 
                 mine_chance = self.cells[cell].mine_chance
                 next_survival = (1 - mine_chance) * (1 - next_mine_chance)
 
-                # Overall survival is a sum of
-                # "survival if the cell is this number" * chance of this number
+                # Overall value is a sum of all values, weighted by possibility
                 overall_survival += next_survival * new_number_chance
+                overall_safe_count += next_safe_count * new_number_chance
 
-            return overall_survival
+            return overall_survival, overall_safe_count
 
         # Convert dict into list, so we could sort it
         self.cells_list = list(self.cells.values())
 
         # Sort the cells by: chance, opening, frontier, next_safe
         self.cells_list.sort(key=lambda x: (-x.mine_chance, x.opening_chance,
-                                            x.frontier, x.next_safe),
+                                            x.frontier, x.csp_next_safe),
                              reverse=True)
 
         # End of recursion, don't go deeper
@@ -885,39 +899,43 @@ class AllProbabilities():
             cell = probability_info.cell
 
             # Calculate survival rate (both click alive) for this cell
-            next_move_survival = calculate_next_move_survival(cell)
+            next_survival, next_safe_count = calculate_next_move_survival(cell)
 
-            # Add this information to the cells_with_next_move list
-            probability_info.next_move_survival = next_move_survival
+            # Add this information to the cells probability info
+            probability_info.next_survival = next_survival
+            probability_info.next_safe_count = next_safe_count
 
             # Mark that this is one of the "shortlisted cells"
             probability_info.shortlisted = 1
-            #print(cell, next_move_survival)
 
         # Sort it by: survival, next_safe,, chance, opening
         self.cells_list.sort(key=lambda x: (x.shortlisted,
-                                            x.next_move_survival,
-                                            x.next_safe, -x.mine_chance,
+                                            x.next_survival,
+                                            x.next_safe_count,
+                                            x.csp_next_safe,
+                                            -x.mine_chance,
                                             x.opening_chance),
                              reverse=True)
 
         # This is the best cell
-        best_survival = self.cells_list[0].next_move_survival
+        best_next_survival = self.cells_list[0].next_survival
+        best_next_safe_count = self.cells_list[0].next_safe_count
         best_opening_chance = self.cells_list[0].opening_chance
-        best_next_safe = self.cells_list[0].next_safe
+        best_csp_next_safe = self.cells_list[0].csp_next_safe
         best_mine_chance = self.cells_list[0].mine_chance
         is_shortlisted = self.cells_list[0].shortlisted
 
         # Pick cells that are as good as the best cell
         best_cells = []
         for probability_info in self.cells_list:
-            if probability_info.next_move_survival == best_survival and \
-                probability_info.opening_chance == best_opening_chance and \
-                probability_info.mine_chance == best_mine_chance and \
-                probability_info.next_safe == best_next_safe and \
-                probability_info.shortlisted == is_shortlisted:
+            if probability_info.next_survival == best_next_survival and \
+               probability_info.next_safe_count == best_next_safe_count and \
+               probability_info.opening_chance == best_opening_chance and \
+               probability_info.mine_chance == best_mine_chance and \
+               probability_info.csp_next_safe == best_csp_next_safe and \
+               probability_info.shortlisted == is_shortlisted:
                 best_cells.append(probability_info.cell)
-        #print(best_cells)
+
         return best_cells
 
 
