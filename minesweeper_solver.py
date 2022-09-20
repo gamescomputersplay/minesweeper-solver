@@ -531,7 +531,7 @@ class MinesweeperSolver:
         # Populate probability object with this info
         for cluster in self.all_clusters.clusters:
             for cell, next_safe in cluster.next_safe.items():
-                self.probability.cells[cell].next_safe = next_safe
+                self.probability.cells[cell].csp_next_safe = next_safe
 
     @staticmethod
     def pick_a_random_cell(cells):
