@@ -903,10 +903,13 @@ class AllProbabilities():
             cell = probability_info.cell
 
             # Calculate survival rate (both click alive) for this cell
-            next_move_survival, _, _ = calculate_next_move_survival(cell)
+            next_move_survival, next_move_safe_count, next_move_safe_chance = \
+                calculate_next_move_survival(cell)
 
-            # Add this information to the cells_with_next_move list
+            # Add this information to the cells probability info
             probability_info.next_move_survival = next_move_survival
+            probability_info.next_move_safe_count = next_move_safe_count
+            probability_info.next_move_safe_chance = next_move_safe_chance
 
             # Mark that this is one of the "shortlisted cells"
             probability_info.shortlisted = 1
@@ -915,12 +918,14 @@ class AllProbabilities():
         # Sort it by: survival, next_safe,, chance, opening
         self.cells_list.sort(key=lambda x: (x.shortlisted,
                                             x.next_move_survival,
+                                            x.next_move_safe_count,
                                             x.csp_next_safe, -x.mine_chance,
                                             x.opening_chance),
                              reverse=True)
 
         # This is the best cell
-        best_survival = self.cells_list[0].next_move_survival
+        best_next_move_survival = self.cells_list[0].next_move_survival
+        best_next_move_safe_count = self.cells_list[0].next_move_safe_count
         best_opening_chance = self.cells_list[0].opening_chance
         best_csp_next_safe = self.cells_list[0].csp_next_safe
         best_mine_chance = self.cells_list[0].mine_chance
@@ -929,7 +934,9 @@ class AllProbabilities():
         # Pick cells that are as good as the best cell
         best_cells = []
         for probability_info in self.cells_list:
-            if probability_info.next_move_survival == best_survival and \
+            if \
+                probability_info.next_move_survival == best_next_move_survival and \
+                probability_info.next_move_safe_count == best_next_move_safe_count and \
                 probability_info.opening_chance == best_opening_chance and \
                 probability_info.mine_chance == best_mine_chance and \
                 probability_info.csp_next_safe == best_csp_next_safe and \
