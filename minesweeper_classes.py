@@ -865,7 +865,7 @@ class AllProbabilities():
                     next_deterministic_chance = 0
                 else:
                     next_mine_chance = 0
-                    next_deterministic_count = len(new_safe) + len(new_mines)
+                    next_deterministic_count = len(new_safe)
                     next_deterministic_chance = 1
 
                 mine_chance = self.cells[cell].mine_chance
