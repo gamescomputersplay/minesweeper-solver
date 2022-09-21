@@ -4,6 +4,7 @@ It would receive a current field and return cells that are
 '''
 
 import random
+import math
 
 import minesweeper_game as mg
 import minesweeper_classes as mc
@@ -65,6 +66,11 @@ class MinesweeperSolver:
         # Used to solve exclaves (like 8) and some probability calculations
         # Populated by "generate_unaccounted"
         self.unaccounted_group = None
+
+        # Placeholder for bruteforce solutions (works only when few enough
+        # cells are left). Used by both deterministic and probability based
+        # methods. Populated by generate_bruteforce
+        self.bruteforce_solutions = None
 
         # Info about last move. Will be used by simulator to analyze
         # performance of different methodsNormally.
@@ -249,6 +255,39 @@ class MinesweeperSolver:
         self.unaccounted_group = mc.MineGroup(unaccounted_cells,
                                               unaccounted_mines)
 
+    def generate_bruteforce(self):
+        ''' Generate and populate bruteforce_solutions. Solutions are list of
+        lists [True, False ..], where True stands for a mine and position is
+        the position of cells in self.cells.
+        '''
+        #for group in self.groups.exact_groups():
+        #    print (group)
+        # dict to simplify looking for cells in solutions
+        cells_positions = {cell: pos for pos, cell in enumerate(self.covered_cells)}
+        #print(cells_positions)
+
+        # Generate all possible combinations of mines
+        permutations = mc.all_mines_positions(len(self.covered_cells), self.remaining_mines)
+        #print(len(permutations))
+
+        # Filter, keeping only those that comply with all groups
+        filtered_permutations = []
+        for permutation in permutations:
+            for group in self.groups.exact_groups():
+                # Count mines in the solution in cells of teh group
+                mine_count = 0
+                for cell in group.cells:
+                    if permutation[cells_positions[cell]]:
+                        mine_count += 1
+                # If count doesn't match - next solution
+                if mine_count != group.mines:
+                    break
+            # If all groups were satisfied - copy solution to filtered solutions
+            else:
+                filtered_permutations.append(permutation)
+
+        self.bruteforce_solutions = filtered_permutations
+
     @staticmethod
     def deduce_safe(group_a, group_b):
         ''' Given two mine groups, deduce if there are any safe cells.
@@ -404,6 +443,12 @@ class MinesweeperSolver:
         ''' Method #5, Coverage.
         Deduce safes and  mines from the "unaccounted" group
         '''
+        # Trivial coverage cases: no mines and all mines
+        if self.remaining_mines == 0:
+            return self.covered_cells, []
+        if len(self.covered_cells) == self.remaining_mines:
+            return [], self.covered_cells
+
         if self.unaccounted_group is None:
             return [], []
 
@@ -413,6 +458,42 @@ class MinesweeperSolver:
         if self.unaccounted_group.is_all_mines():
             mines.extend(list(self.unaccounted_group.cells))
         return list(set(safe)), list(set(mines))
+
+    def method_bruteforce(self):
+        '''Bruteforce mine probabilities, when there are only a handful
+        of cells/mines left. This replaces more sophisticate
+        calculate_probabilities method.
+        '''
+        # Use this method only if there is not a lot combinations to go through
+        if len(self.covered_cells) > 25 or \
+           math.comb(len(self.covered_cells), self.remaining_mines) > 3060:
+            return [], []
+
+        safe, mines = [], []
+        self.generate_bruteforce()
+
+        # Go through all cells
+        for position, cell in enumerate(self.covered_cells):
+            # And count mines in all solutions in this position
+            solutions_with_mines = 0
+            for solution in self.bruteforce_solutions:
+                if solution[position]:
+                    solutions_with_mines += 1
+
+            # If there were no mines - this cell is safe
+            if solutions_with_mines == 0:
+                safe.append(cell)
+            # If there were as many mines as solutions - it's a mine
+            elif solutions_with_mines == len(self.bruteforce_solutions):
+                mines.append(cell)
+
+        return safe, mines
+
+    def bruteforce_probabilities(self):
+        '''Bruteforce mine probabilities, when there are only a handful
+        of cells/mines left. This replaces more sophisticate
+        calculate_probabilities method.
+        '''
 
     def calculate_probabilities(self):
         ''' Final method. "Probability". Use various methods to determine
@@ -580,20 +661,31 @@ class MinesweeperSolver:
                 (self.method_subgroups, "Subgroups"),
                 (self.method_csp, "CSP"),
                 (self.method_coverage, "Coverage"),
+                #(self.method_bruteforce, "Bruteforce"),
                 ):
             safe, mines = method()
             if safe or mines:
                 self.last_move_info = (method_name, None, None)
                 return safe, mines
 
-        # Calculate mine probability using various methods
-        self.calculate_probabilities()
-        # Calculate opening chances
+        # Bruteforce probabilities will go here
+        if len(self.covered_cells) <= -1: #16:
+            # Bruteforce-based calculation of probabilities
+            # if there are not a lot cells and mines left
+            self.bruteforce_probabilities()
+        # Otherwise use more complex approach
+        else:
+            # Calculate mine probability using various methods
+            self.calculate_probabilities()
+            # Calculate safe cells for teh next move in CSP
+            self.calculate_next_safe_csp()
+
+        # Two more calculations that will be used to pick
+        # the best random cell:
+        # Opening chances (chance that cell is a zero)
         self.calculate_opening_chances()
-        # Calculate frontier values
+        # Does it touch a frontier (cells that already are in groups)
         self.calculate_frontier()
-        # Calculate safe cells for teh next move in CSP
-        self.calculate_next_safe_csp()
 
         # Get cells that is least likely a mine
         lucky_cells = \
@@ -620,14 +712,15 @@ def main():
 
     settings = mg.GAME_TEST
     settings = mg.GAME_BEGINNER
+    settings = mg.GAME_INTERMEDIATE
     # settings = mg.GAME_EXPERT
 
-    game = mg.MinesweeperGame(settings, seed=0)
+    game = mg.MinesweeperGame(settings, seed=2)
     solver = MinesweeperSolver(settings)
 
     while game.status == mg.STATUS_ALIVE:
 
-        safe, mines = solver.solve(game.uncovered, next_moves=1)
+        safe, mines = solver.solve(game.uncovered, next_moves=0)
         method, random_method, chance = solver.last_move_info
 
         chance_str, random_method_str = "", ""

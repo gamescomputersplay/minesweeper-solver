@@ -22,6 +22,7 @@ SHOW_METHODS_STAT = True
 SHOW_PROBABILITY_STAT = True
 
 # How many moves ahead analyze (0 - only the current position)
+# Default is 1
 LOOK_NEXT_MOVES = 1
 
 
@@ -379,7 +380,7 @@ def main():
     seed = 0
 
     # games to simulate
-    runs = 100
+    runs = 1000
 
     # All popular minesweeper and multidimensional minesweeper presets
     presets = (mg.GAME_BEGINNER, mg.GAME_INTERMEDIATE, mg.GAME_EXPERT,

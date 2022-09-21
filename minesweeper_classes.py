@@ -195,6 +195,40 @@ class AllGroups:
         return f"MineGroups contains {len(self.mine_groups)} groups"
 
 
+# This method used for solving clusters and for brute force probabilities,
+# So it is outside of classes
+def all_mines_positions(cells_count, mines_to_set):
+    ''' Generate all permutations for "mines_to_set" mines to be in
+    "cells_count" cells.
+    Result is a list of tuples like (False, False, True, False),
+    indicating if the item was chosen (if there is a mine in the cell).
+    For example, for generate_mines_permutations(2, 1) the output is:
+    [(True, False), (False, True)]
+    '''
+
+    def recursive_choose_generator(current_combination, mines_to_set):
+        ''' Recursive part of "Choose without replacement" permutation
+        generator, results are put into outside "result" variable
+        '''
+        # No mines to set: save results, out of the recursion
+        if mines_to_set == 0:
+            result.add(tuple(current_combination))
+            return
+
+        for position, item in enumerate(current_combination):
+            # Find all the "False" (not a mine) cells
+            if not item:
+                # Put a mine in it, go to the next recursion level
+                current_copy = current_combination.copy()
+                current_copy[position] = True
+                recursive_choose_generator(current_copy, mines_to_set - 1)
+
+    result = set()
+    all_cells_false = [False for _ in range(cells_count)]
+    recursive_choose_generator(all_cells_false, mines_to_set)
+    return result
+
+
 class GroupCluster:
     ''' GroupCluster are several MineGroups connected together. All groups
     overlap at least with one other groups o  mine/safe in any of the cell
@@ -254,38 +288,6 @@ class GroupCluster:
         '''
         return len(self.cells_set & group.cells) > 0
 
-    @staticmethod
-    def all_mines_positions(cells_count, mines_to_set):
-        ''' Generate all permutations for "mines_to_set" mines to be in
-        "cells_count" cells.
-        Result is a list of tuples like (False, False, True, False),
-        indicating if the item was chosen (if there is a mine in the cell).
-        For example, for generate_mines_permutations(2, 1) the output is:
-        [(True, False), (False, True)]
-        '''
-
-        def recursive_choose_generator(current_combination, mines_to_set):
-            ''' Recursive part of "Choose without replacement" permutation
-            generator, results are put into outside "result" variable
-            '''
-            # No mines to set: save results, out of the recursion
-            if mines_to_set == 0:
-                result.add(tuple(current_combination))
-                return
-
-            for position, item in enumerate(current_combination):
-                # Find all the "False" (not a mine) cells
-                if not item:
-                    # Put a mine in it, go to the next recursion level
-                    current_copy = current_combination.copy()
-                    current_copy[position] = True
-                    recursive_choose_generator(current_copy, mines_to_set - 1)
-
-        result = set()
-        all_cells_false = [False for _ in range(cells_count)]
-        recursive_choose_generator(all_cells_false, mines_to_set)
-        return result
-
     def solve_cluster(self, remaining_mines):
         ''' Use CSP to find the solution to the CSP. Solution is the list of
         all possible mine/safe variations that fits all groups' condition.
@@ -328,8 +330,8 @@ class GroupCluster:
 
             # List of all possible ways mines can be placed in
             # group's cells: for example: [(False, True, False), ...]
-            mine_positions = self.all_mines_positions(len(group.cells),
-                                                      group.mines)
+            mine_positions = all_mines_positions(len(group.cells),
+                                                 group.mines)
             # Now the same, but with cells as keys
             # For example: {cell1: False, cell2: True, cell3: False}
             mine_positions_dict = [dict(zip(group.cells, mine_position))
