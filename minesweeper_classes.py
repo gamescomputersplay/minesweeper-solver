@@ -882,10 +882,11 @@ class AllProbabilities():
                                             x.frontier, x.csp_next_safe),
                              reverse=True)
 
-        # End of recursion, don't go deeper
-        # Just return all cells with best mine and open chances
+        # Simple best cells are those we can calculate without looking into
+        # next move. Return them if we don't need to look into next moves
+        simple_best_cells = simple_best_probability()
         if next_moves == 0:
-            return simple_best_probability()
+            return simple_best_cells
 
         # Keep recursion going: check what will be the mine chance for
         # the next move (Currently being implemented)
@@ -935,6 +936,12 @@ class AllProbabilities():
                probability_info.csp_next_safe == best_csp_next_safe and \
                probability_info.shortlisted == is_shortlisted:
                 best_cells.append(probability_info.cell)
+
+        # If the result is different from what we got using simple method
+        # Mark the probability method as as "Next move"
+        if set(simple_best_cells) != set(best_cells):
+            for cell in best_cells:
+                self.cells[cell].source = "Next move"
 
         return best_cells
 
