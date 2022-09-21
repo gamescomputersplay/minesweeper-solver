@@ -6,9 +6,9 @@ import time
 import math
 import random
 
-# progress bar
+# Progress bar
 from tqdm import tqdm
-# text table
+# Text table
 from texttable import Texttable
 
 import minesweeper_game as mg
@@ -376,10 +376,10 @@ def main():
     ''' Run a sample simulation
     '''
 
-    # use seed for replicable simulations
+    # Use seed for replicable simulations
     seed = 0
 
-    # games to simulate
+    # Games to simulate
     runs = 100
 
     # All popular minesweeper and multidimensional minesweeper presets

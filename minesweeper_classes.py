@@ -834,7 +834,6 @@ class AllProbabilities():
             if we chose to click cell
             '''
             probable_new_numbers = clusters.get_mines_chances(cell)
-            # print (f"-- Probable mines: {probable_new_mines}")
 
             # Chance to survive over 2 moves
             overall_survival = 0
@@ -843,7 +842,6 @@ class AllProbabilities():
 
             # Now go through possible values for that cell
             for new_number, new_number_chance in probable_new_numbers.items():
-                # print(f"--- Start doing option: ({new_mines_count})")
                 # Copy of the current field
                 new_field = original_solver.field.copy()
 
@@ -901,12 +899,13 @@ class AllProbabilities():
         cells_for_next_move = 1
         # It should be no bigger than 5 and there should be no more than 5%
         # difference in mine chance with the best cell
+        best_mine_chance = self.cells_list[0].mine_chance
         for i in range(1, min(5, len(self.cells_list))):
-            if self.cells_list[i].mine_chance - self.cells_list[0].mine_chance < .05:
+            if self.cells_list[i].mine_chance - best_mine_chance < .05:
                 cells_for_next_move = i + 1
-        #print(cells_for_next_move)
 
-        # If there is one 1 cell for looking into next move - no need for the next move
+        # If there is one 1 cell for looking into next move - no need to
+        # calculate what is going to happen in the next move
         if cells_for_next_move == 1:
             return simple_best_cells
 
@@ -959,7 +958,6 @@ class AllProbabilities():
             for cell in best_cells:
                 self.cells[cell].source = "Next move"
 
-        #print(self.cells[simple_best_cells[0]].mine_chance, self.cells[best_cells[0]].mine_chance)
         return best_cells
 
 

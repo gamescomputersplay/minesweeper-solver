@@ -659,9 +659,6 @@ class MinesweeperSolver:
                             (self.method_bruteforce, "Bruteforce"),
                             ]
 
-        #if next_moves == 0:
-        #    solution_methods = solution_methods[:5]
-
         # If any of the methods returned results - return the result
         for method, method_name in solution_methods:
             # Run the method from the list
@@ -719,12 +716,12 @@ def main():
     settings = mg.GAME_INTERMEDIATE
     # settings = mg.GAME_EXPERT
 
-    game = mg.MinesweeperGame(settings, seed=2)
+    game = mg.MinesweeperGame(settings, seed=0)
     solver = MinesweeperSolver(settings)
 
     while game.status == mg.STATUS_ALIVE:
 
-        safe, mines = solver.solve(game.uncovered, next_moves=0)
+        safe, mines = solver.solve(game.uncovered, next_moves=1)
         method, random_method, chance = solver.last_move_info
 
         chance_str, random_method_str = "", ""
