@@ -887,6 +887,7 @@ class AllProbabilities():
         # Simple best cells are those we can calculate without looking into
         # next move. Return them if we don't need to look into next moves
         simple_best_cells = simple_best_probability()
+
         if next_moves == 0:
             return simple_best_cells
 
@@ -896,8 +897,11 @@ class AllProbabilities():
         # Make a copy of the solver (so not to regenerate helpers)
         new_solver = original_solver.copy()
 
+        # Number of cells to calculate second move for
+        cells_for_next_move = 5
+
         # Calculate probable number of mines in those cells
-        for probability_info in self.cells_list[:5]:
+        for probability_info in self.cells_list[:cells_for_next_move]:
 
             cell = probability_info.cell
 

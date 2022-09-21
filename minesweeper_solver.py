@@ -260,15 +260,12 @@ class MinesweeperSolver:
         lists [True, False ..], where True stands for a mine and position is
         the position of cells in self.cells.
         '''
-        #for group in self.groups.exact_groups():
-        #    print (group)
+
         # dict to simplify looking for cells in solutions
         cells_positions = {cell: pos for pos, cell in enumerate(self.covered_cells)}
-        #print(cells_positions)
 
         # Generate all possible combinations of mines
         permutations = mc.all_mines_positions(len(self.covered_cells), self.remaining_mines)
-        #print(len(permutations))
 
         # Filter, keeping only those that comply with all groups
         filtered_permutations = []
@@ -653,18 +650,25 @@ class MinesweeperSolver:
         # Unaccounted cells (covered minus mines, has  to go after the  groups)
         self.generate_unaccounted()
 
-        # Try 4 deterministic methods
-        # If any yielded result - return it
-        for method, method_name in (
-                (self.method_naive, "Naive"),
-                (self.method_groups, "Groups"),
-                (self.method_subgroups, "Subgroups"),
-                (self.method_csp, "CSP"),
-                (self.method_coverage, "Coverage"),
-                #(self.method_bruteforce, "Bruteforce"),
-                ):
+        # These are6 deterministic methods to try
+        solution_methods = [(self.method_naive, "Naive"),
+                            (self.method_groups, "Groups"),
+                            (self.method_subgroups, "Subgroups"),
+                            (self.method_coverage, "Coverage"),
+                            (self.method_csp, "CSP"),
+                            (self.method_bruteforce, "Bruteforce"),
+                            ]
+
+        if next_moves == 0:
+            solution_methods = solution_methods[:5]
+
+        # If any of the methods returned results - return the result
+        for method, method_name in solution_methods:
+            # Run the method from the list
             safe, mines = method()
+            # If method was successful (found at least safe or mine)
             if safe or mines:
+                # Update the last move info and return found cells
                 self.last_move_info = (method_name, None, None)
                 return safe, mines
 
