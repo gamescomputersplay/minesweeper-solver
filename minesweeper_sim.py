@@ -380,7 +380,7 @@ def main():
     seed = 0
 
     # games to simulate
-    runs = 1000
+    runs = 100
 
     # All popular minesweeper and multidimensional minesweeper presets
     presets = (mg.GAME_BEGINNER, mg.GAME_INTERMEDIATE, mg.GAME_EXPERT,

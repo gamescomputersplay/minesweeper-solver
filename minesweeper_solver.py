@@ -659,8 +659,8 @@ class MinesweeperSolver:
                             (self.method_bruteforce, "Bruteforce"),
                             ]
 
-        if next_moves == 0:
-            solution_methods = solution_methods[:5]
+        #if next_moves == 0:
+        #    solution_methods = solution_methods[:5]
 
         # If any of the methods returned results - return the result
         for method, method_name in solution_methods:

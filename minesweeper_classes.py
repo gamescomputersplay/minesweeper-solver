@@ -897,8 +897,18 @@ class AllProbabilities():
         # Make a copy of the solver (so not to regenerate helpers)
         new_solver = original_solver.copy()
 
-        # Number of cells to calculate second move for
-        cells_for_next_move = 5
+        # Determine the number of cells to calculate second move for
+        cells_for_next_move = 1
+        # It should be no bigger than 5 and there should be no more than 5%
+        # difference in mine chance with the best cell
+        for i in range(1, min(5, len(self.cells_list))):
+            if self.cells_list[i].mine_chance - self.cells_list[0].mine_chance < .05:
+                cells_for_next_move = i + 1
+        #print(cells_for_next_move)
+
+        # If there is one 1 cell for looking into next move - no need for the next move
+        if cells_for_next_move == 1:
+            return simple_best_cells
 
         # Calculate probable number of mines in those cells
         for probability_info in self.cells_list[:cells_for_next_move]:
@@ -949,6 +959,7 @@ class AllProbabilities():
             for cell in best_cells:
                 self.cells[cell].source = "Next move"
 
+        #print(self.cells[simple_best_cells[0]].mine_chance, self.cells[best_cells[0]].mine_chance)
         return best_cells
 
 
