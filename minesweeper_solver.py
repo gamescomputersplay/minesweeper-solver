@@ -669,6 +669,11 @@ class MinesweeperSolver:
                 self.last_move_info = (method_name, None, None)
                 return safe, mines
 
+        # Empty bruteforce means illegal field (may happen when we try
+        # all combinations for the next move)
+        if  self.bruteforce_solutions == []:
+            return [-1], [-1]
+
         # Bruteforce probabilities will go here
         if len(self.covered_cells) <= -1: #16:
             # Bruteforce-based calculation of probabilities

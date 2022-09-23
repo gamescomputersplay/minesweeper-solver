@@ -840,6 +840,9 @@ class AllProbabilities():
             # Expected count of safe cells for the second move
             overall_safe_count = 0
 
+            # Sum of chances that results in illegal board
+            correct_for_illegals = 0
+
             # Now go through possible values for that cell
             for new_number, new_number_chance in probable_new_numbers.items():
                 # Copy of the current field
@@ -857,6 +860,11 @@ class AllProbabilities():
                 # recursion value
                 new_safe, _ = new_solver.solve(new_field, next_moves - 1)
 
+                # Ignore illegal combinations
+                if new_safe == [-1]:
+                    correct_for_illegals += new_number_chance
+                    continue
+
                 # Calculate result for this number option in the cell
                 if new_solver.last_move_info[0] == "Probability":
                     next_mine_chance = new_solver.last_move_info[2]
@@ -871,6 +879,12 @@ class AllProbabilities():
                 # Overall value is a sum of all values, weighted by possibility
                 overall_survival += next_survival * new_number_chance
                 overall_safe_count += next_safe_count * new_number_chance
+
+            # Correct for illegal combinations
+            if correct_for_illegals != 0:
+                correction = 1 / (1 - correct_for_illegals)
+                overall_survival *= correction
+                overall_safe_count *= correction
 
             return overall_survival, overall_safe_count
 
