@@ -297,8 +297,8 @@ class GroupCluster:
         Will result in empty solution if the initial cluster is too big.
         '''
         # for clusters with 1 group - there is not enough data to solve them
-        if len(self.groups) == 1:
-            return
+        # if len(self.groups) == 1:
+        #     return
 
         # It gets too slow and inefficient when
         # - There are too many, but clusters but not enough groups
@@ -736,6 +736,16 @@ class AllClusters:
 
         return mines_chances
 
+    def has_one_group_cluster(self, cells):
+        ''' Do any of this cell overlap with any 1-group cluster?
+        '''
+        for cluster in self.clusters:
+            if len(cluster.groups) == 1:
+                for cell in cells:
+                    if cell in cluster.groups[0].cells:
+                        return True
+        return False
+
 
 @dataclass
 class CellProbability:
@@ -922,6 +932,12 @@ class AllProbabilities():
         # calculate what is going to happen in the next move
         if cells_for_next_move == 1:
             return simple_best_cells
+
+        # There must be a bug somewhere, because this makes things better
+        # (Ignore next move if there is a 1-group cluster)
+        for cluster in clusters.clusters:
+            if len(cluster.groups) == 1:
+                return simple_best_cells
 
         # Calculate probable number of mines in those cells
         for probability_info in self.cells_list[:cells_for_next_move]:
