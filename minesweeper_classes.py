@@ -868,7 +868,7 @@ class AllProbabilities():
 
                 # Run the solver, pass in the updated field and decreased
                 # recursion value
-                new_safe, _ = new_solver.solve(new_field, next_moves - 1)
+                new_safe, new_mines = new_solver.solve(new_field, next_moves - 1)
 
                 # Ignore illegal combinations
                 if new_safe == [-1]:
@@ -881,7 +881,7 @@ class AllProbabilities():
                     next_safe_count = 0
                 else:
                     next_mine_chance = 0
-                    next_safe_count = len(new_safe)
+                    next_safe_count = len(new_safe) +len(new_mines) * 0.5
 
                 mine_chance = self.cells[cell].mine_chance
                 next_survival = (1 - mine_chance) * (1 - next_mine_chance)
@@ -957,9 +957,8 @@ class AllProbabilities():
         # Sort it by: survival, next_safe,, chance, opening
         self.cells_list.sort(key=lambda x: (x.shortlisted,
                                             x.next_survival,
-                                            x.next_safe_count,
                                             x.csp_next_safe,
-                                            -x.mine_chance,
+                                            x.next_safe_count,
                                             x.opening_chance),
                              reverse=True)
 
