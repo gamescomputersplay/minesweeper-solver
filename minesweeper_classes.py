@@ -195,6 +195,40 @@ class AllGroups:
         return f"MineGroups contains {len(self.mine_groups)} groups"
 
 
+# This method used for solving clusters and for brute force probabilities,
+# So it is outside of classes
+def all_mines_positions(cells_count, mines_to_set):
+    ''' Generate all permutations for "mines_to_set" mines to be in
+    "cells_count" cells.
+    Result is a list of tuples like (False, False, True, False),
+    indicating if the item was chosen (if there is a mine in the cell).
+    For example, for generate_mines_permutations(2, 1) the output is:
+    [(True, False), (False, True)]
+    '''
+
+    def recursive_choose_generator(current_combination, mines_to_set):
+        ''' Recursive part of "Choose without replacement" permutation
+        generator, results are put into outside "result" variable
+        '''
+        # No mines to set: save results, out of the recursion
+        if mines_to_set == 0:
+            result.add(tuple(current_combination))
+            return
+
+        for position, item in enumerate(current_combination):
+            # Find all the "False" (not a mine) cells
+            if not item:
+                # Put a mine in it, go to the next recursion level
+                current_copy = current_combination.copy()
+                current_copy[position] = True
+                recursive_choose_generator(current_copy, mines_to_set - 1)
+
+    result = set()
+    all_cells_false = [False for _ in range(cells_count)]
+    recursive_choose_generator(all_cells_false, mines_to_set)
+    return result
+
+
 class GroupCluster:
     ''' GroupCluster are several MineGroups connected together. All groups
     overlap at least with one other groups o  mine/safe in any of the cell
@@ -254,38 +288,6 @@ class GroupCluster:
         '''
         return len(self.cells_set & group.cells) > 0
 
-    @staticmethod
-    def all_mines_positions(cells_count, mines_to_set):
-        ''' Generate all permutations for "mines_to_set" mines to be in
-        "cells_count" cells.
-        Result is a list of tuples like (False, False, True, False),
-        indicating if the item was chosen (if there is a mine in the cell).
-        For example, for generate_mines_permutations(2, 1) the output is:
-        [(True, False), (False, True)]
-        '''
-
-        def recursive_choose_generator(current_combination, mines_to_set):
-            ''' Recursive part of "Choose without replacement" permutation
-            generator, results are put into outside "result" variable
-            '''
-            # No mines to set: save results, out of the recursion
-            if mines_to_set == 0:
-                result.add(tuple(current_combination))
-                return
-
-            for position, item in enumerate(current_combination):
-                # Find all the "False" (not a mine) cells
-                if not item:
-                    # Put a mine in it, go to the next recursion level
-                    current_copy = current_combination.copy()
-                    current_copy[position] = True
-                    recursive_choose_generator(current_copy, mines_to_set - 1)
-
-        result = set()
-        all_cells_false = [False for _ in range(cells_count)]
-        recursive_choose_generator(all_cells_false, mines_to_set)
-        return result
-
     def solve_cluster(self, remaining_mines):
         ''' Use CSP to find the solution to the CSP. Solution is the list of
         all possible mine/safe variations that fits all groups' condition.
@@ -295,8 +297,8 @@ class GroupCluster:
         Will result in empty solution if the initial cluster is too big.
         '''
         # for clusters with 1 group - there is not enough data to solve them
-        if len(self.groups) == 1:
-            return
+        # if len(self.groups) == 1:
+        #     return
 
         # It gets too slow and inefficient when
         # - There are too many, but clusters but not enough groups
@@ -328,8 +330,8 @@ class GroupCluster:
 
             # List of all possible ways mines can be placed in
             # group's cells: for example: [(False, True, False), ...]
-            mine_positions = self.all_mines_positions(len(group.cells),
-                                                      group.mines)
+            mine_positions = all_mines_positions(len(group.cells),
+                                                 group.mines)
             # Now the same, but with cells as keys
             # For example: {cell1: False, cell2: True, cell3: False}
             mine_positions_dict = [dict(zip(group.cells, mine_position))
@@ -392,7 +394,7 @@ class GroupCluster:
         for position, cell in enumerate(self.cells):
             count_mines = 0
             for solution_n, solution in enumerate(self.solutions):
-                # Mine count takes into account the weight of teh solution
+                # Mine count takes into account the weight of the solution
                 # So if fact it is 1 * weight
                 if solution[position]:
                     count_mines += self.solution_weights[solution_n]
@@ -694,7 +696,7 @@ class AllClusters:
         return overall_mine_chances
 
     def get_mines_chances(self, cell):
-        ''' Calculate mine counts and their chances for teh cell "cell"
+        ''' Calculate mine counts and their chances for the cell "cell"
         '''
 
         # Get the list of neighbors for this cell
@@ -733,6 +735,16 @@ class AllClusters:
             mines_chances = updated_mine_chances
 
         return mines_chances
+
+    def has_one_group_cluster(self, cells):
+        ''' Do any of this cell overlap with any 1-group cluster?
+        '''
+        for cluster in self.clusters:
+            if len(cluster.groups) == 1:
+                for cell in cells:
+                    if cell in cluster.groups[0].cells:
+                        return True
+        return False
 
 
 @dataclass
@@ -832,16 +844,17 @@ class AllProbabilities():
             if we chose to click cell
             '''
             probable_new_numbers = clusters.get_mines_chances(cell)
-            # print (f"-- Probable mines: {probable_new_mines}")
 
             # Chance to survive over 2 moves
             overall_survival = 0
             # Expected count of safe cells for the second move
             overall_safe_count = 0
 
+            # Sum of chances that results in illegal board
+            correct_for_illegals = 0
+
             # Now go through possible values for that cell
             for new_number, new_number_chance in probable_new_numbers.items():
-                # print(f"--- Start doing option: ({new_mines_count})")
                 # Copy of the current field
                 new_field = original_solver.field.copy()
 
@@ -855,7 +868,12 @@ class AllProbabilities():
 
                 # Run the solver, pass in the updated field and decreased
                 # recursion value
-                new_safe, _ = new_solver.solve(new_field, next_moves - 1)
+                new_safe, new_mines = new_solver.solve(new_field, next_moves - 1)
+
+                # Ignore illegal combinations
+                if new_safe == [-1]:
+                    correct_for_illegals += new_number_chance
+                    continue
 
                 # Calculate result for this number option in the cell
                 if new_solver.last_move_info[0] == "Probability":
@@ -863,7 +881,7 @@ class AllProbabilities():
                     next_safe_count = 0
                 else:
                     next_mine_chance = 0
-                    next_safe_count = len(new_safe)
+                    next_safe_count = len(new_safe) +len(new_mines) * 0.5
 
                 mine_chance = self.cells[cell].mine_chance
                 next_survival = (1 - mine_chance) * (1 - next_mine_chance)
@@ -871,6 +889,12 @@ class AllProbabilities():
                 # Overall value is a sum of all values, weighted by possibility
                 overall_survival += next_survival * new_number_chance
                 overall_safe_count += next_safe_count * new_number_chance
+
+            # Correct for illegal combinations
+            if correct_for_illegals != 0:
+                correction = 1 / (1 - correct_for_illegals)
+                overall_survival *= correction
+                overall_safe_count *= correction
 
             return overall_survival, overall_safe_count
 
@@ -885,6 +909,7 @@ class AllProbabilities():
         # Simple best cells are those we can calculate without looking into
         # next move. Return them if we don't need to look into next moves
         simple_best_cells = simple_best_probability()
+
         if next_moves == 0:
             return simple_best_cells
 
@@ -894,8 +919,22 @@ class AllProbabilities():
         # Make a copy of the solver (so not to regenerate helpers)
         new_solver = original_solver.copy()
 
+        # Determine the number of cells to calculate second move for
+        cells_for_next_move = 1
+        # It should be no bigger than 5 and there should be no more than 5%
+        # difference in mine chance with the best cell
+        best_mine_chance = self.cells_list[0].mine_chance
+        for i in range(1, min(5, len(self.cells_list))):
+            if self.cells_list[i].mine_chance - best_mine_chance < .05:
+                cells_for_next_move = i + 1
+
+        # If there is one 1 cell for looking into next move - no need to
+        # calculate what is going to happen in the next move
+        if cells_for_next_move == 1:
+            return simple_best_cells
+
         # Calculate probable number of mines in those cells
-        for probability_info in self.cells_list[:5]:
+        for probability_info in self.cells_list[:cells_for_next_move]:
 
             cell = probability_info.cell
 
@@ -912,9 +951,8 @@ class AllProbabilities():
         # Sort it by: survival, next_safe,, chance, opening
         self.cells_list.sort(key=lambda x: (x.shortlisted,
                                             x.next_survival,
-                                            x.next_safe_count,
                                             x.csp_next_safe,
-                                            -x.mine_chance,
+                                            x.next_safe_count,
                                             x.opening_chance),
                              reverse=True)
 

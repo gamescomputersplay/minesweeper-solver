@@ -6,9 +6,9 @@ import time
 import math
 import random
 
-# progress bar
+# Progress bar
 from tqdm import tqdm
-# text table
+# Text table
 from texttable import Texttable
 
 import minesweeper_game as mg
@@ -22,6 +22,7 @@ SHOW_METHODS_STAT = True
 SHOW_PROBABILITY_STAT = True
 
 # How many moves ahead analyze (0 - only the current position)
+# Default is 1
 LOOK_NEXT_MOVES = 1
 
 
@@ -375,10 +376,10 @@ def main():
     ''' Run a sample simulation
     '''
 
-    # use seed for replicable simulations
+    # Use seed for replicable simulations
     seed = 0
 
-    # games to simulate
+    # Games to simulate
     runs = 100
 
     # All popular minesweeper and multidimensional minesweeper presets
