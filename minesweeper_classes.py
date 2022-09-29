@@ -394,7 +394,7 @@ class GroupCluster:
         for position, cell in enumerate(self.cells):
             count_mines = 0
             for solution_n, solution in enumerate(self.solutions):
-                # Mine count takes into account the weight of teh solution
+                # Mine count takes into account the weight of the solution
                 # So if fact it is 1 * weight
                 if solution[position]:
                     count_mines += self.solution_weights[solution_n]
@@ -696,7 +696,7 @@ class AllClusters:
         return overall_mine_chances
 
     def get_mines_chances(self, cell):
-        ''' Calculate mine counts and their chances for teh cell "cell"
+        ''' Calculate mine counts and their chances for the cell "cell"
         '''
 
         # Get the list of neighbors for this cell
@@ -932,12 +932,6 @@ class AllProbabilities():
         # calculate what is going to happen in the next move
         if cells_for_next_move == 1:
             return simple_best_cells
-
-        # There must be a bug somewhere, because this makes things better
-        # (Ignore next move if there is a 1-group cluster)
-        for cluster in clusters.clusters:
-            if len(cluster.groups) == 1:
-                return simple_best_cells
 
         # Calculate probable number of mines in those cells
         for probability_info in self.cells_list[:cells_for_next_move]:
