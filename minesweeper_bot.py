@@ -628,10 +628,10 @@ def main():
     '''Run the bot program
     '''
     # Playing regular classic minesweeper
-    # use_bot(10)
+    use_bot(10)
 
     # Playing 4D Steam Minesweeper
-    use_bot(1, settings=SETTINGS_MINESWEEPER_4D, mines=20, is_4d=True)
+    # use_bot(1, settings=SETTINGS_MINESWEEPER_4D, mines=20, is_4d=True)
 
 
 if __name__ == "__main__":
