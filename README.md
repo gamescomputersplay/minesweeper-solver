@@ -2,7 +2,7 @@
 
 ### N-dimensional Solver / simulator 
 
-Minesweeper solver simulates or plays minesweeper games. It uses both deterministic and probability-based logic to come up with its moves, reaching the win rate of 39% for a standard Expert game (30x16, 99 mines). Simulator also supports N-dimensional minesweeper games.
+Minesweeper solver simulates or plays minesweeper games. It uses both deterministic and probability-based logic to come up with its moves, reaching the win rate of 38.6±0.3% for a standard Expert game (30x16, 99 mines). Simulator also supports N-dimensional minesweeper games.
 
 ### Bot 
 
@@ -44,11 +44,11 @@ Program starts with generating groups - a simplest amount of information about m
 
 First click is always on an all-zero coordinate cell.
 
-### 1. Naive (88%)
+### Naive (88%)
 
 If there are zero mines in a group - all cells are safe. If there are as many mines as cells - all cells are mines.
 
-### 2. Groups (8%)
+### Groups (8%)
 
 Search for groups that are included in another group and deduce safe/mines from that. For example:
 - cells AB have 1 mine; cells ABC have 1 mine: cell C is safe
