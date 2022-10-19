@@ -198,7 +198,7 @@ class MinesweeperHelper:
             if self.wrap_around:
                 cell_with_offset = tuple((cell[i] + offset[i] +
                                           self.shape[i]) % self.shape[i]
-                                          for i in range(len(self.shape)))
+                                         for i in range(len(self.shape)))
             else:
                 cell_with_offset = tuple(cell[i] + offset[i]
                                          for i in range(len(self.shape)))
@@ -262,7 +262,8 @@ class MinesweeperGame:
         if seed is not None:
             random.seed(seed)
 
-        self.helper = MinesweeperHelper(self.shape, wrap_around=self.wrap_around)
+        self.helper = MinesweeperHelper(self.shape,
+                                        wrap_around=self.wrap_around)
 
         # Now we initiate "field": array of mines and numbers that player
         # cannot see yet
@@ -488,7 +489,7 @@ class MinesweeperGame:
         width = field_to_show.shape[0]
         field_to_show = np.reshape(field_to_show, (width, 1))
 
-        return self.field2str_2d(field_to_show, show_ruler=True)
+        return self.field2str_2d(field_to_show, show_ruler)
 
     @staticmethod
     def field2str_2d(field_to_show, show_ruler=True):
@@ -667,8 +668,9 @@ class MinesweeperGame:
         return safe, mines
 
     def export_field(self, field=None):
-        '''Save the field into a log file, so later we will be able to import it.
-        For debugging purposes
+        '''Save the field into a log file,
+        so later we will be able to import it.
+        (For debugging purposes)
         '''
         # If no field passed in - use current game
         if field is None:

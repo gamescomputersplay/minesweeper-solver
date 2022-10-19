@@ -386,7 +386,8 @@ def main():
     presets = (mg.GAME_BEGINNER, mg.GAME_INTERMEDIATE, mg.GAME_EXPERT)
 
     # 2D with wrapping
-    presets = (mg.GAME_BEGINNER_WRAP, mg.GAME_INTERMEDIATE_WRAP, mg.GAME_EXPERT_WRAP, )
+    presets = (mg.GAME_BEGINNER_WRAP, mg.GAME_INTERMEDIATE_WRAP,
+               mg.GAME_EXPERT_WRAP)
 
     # All popular 3D and 4D presets
     presets = (mg.GAME_3D_EASY, mg.GAME_3D_MEDIUM, mg.GAME_3D_HARD,

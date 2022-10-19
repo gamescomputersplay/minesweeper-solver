@@ -6,9 +6,9 @@ Minesweeper solver simulates or plays minesweeper games. It uses both determinis
 
 Simulator also supports N-dimensional minesweeper games. With N from 1 to anything.
 
-Note, that although there is no upper boundary on the number of dimensions, it's the computational explosion that provides a limit. 6-dimensional 4^6 slows to a crawl (a minute per game), and 8-dimensional game crashed, depleting all my laptop's memory in the process.
+Note, that although there is no upper boundary on the number of dimensions, it's the computational explosion that provides a limit. 7-dimensional 4^7 slows to a crawl (it requires several minutes per one game simulation), and 8-dimensional game crashed, depleting all my laptop's memory in the process.
 
-It also supports wrapping the field around on itself. In case of 2D that would correspond to the surface of a torus.  
+It also supports wrapping the field around on itself. In case of 1D that's a circumference of a circle, for 2D that would correspond to the surface of a 3D torus. For N dimensions - surface of N+1 torus, I guess???
 
 ### Bot 
 

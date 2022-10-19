@@ -266,10 +266,12 @@ class MinesweeperSolver:
         '''
 
         # dict to simplify looking for cells in solutions
-        cells_positions = {cell: pos for pos, cell in enumerate(self.covered_cells)}
+        cells_positions = {cell: pos
+                           for pos, cell in enumerate(self.covered_cells)}
 
         # Generate all possible combinations of mines
-        permutations = mc.all_mines_positions(len(self.covered_cells), self.remaining_mines)
+        permutations = mc.all_mines_positions(len(self.covered_cells),
+                                              self.remaining_mines)
 
         # Filter, keeping only those that comply with all groups
         filtered_permutations = []
@@ -283,7 +285,7 @@ class MinesweeperSolver:
                 # If count doesn't match - next solution
                 if mine_count != group.mines:
                     break
-            # If all groups were satisfied - copy solution to filtered solutions
+            # If all groups were satisfied, copy solution to filtered list
             else:
                 filtered_permutations.append(permutation)
 
@@ -531,7 +533,8 @@ class MinesweeperSolver:
                     if group_probability > \
                        self.probability.cells[cell].mine_chance:
                         self.probability.cells[cell] = \
-                            mc.CellProbability(cell, "Groups", group_probability)
+                            mc.CellProbability(cell, "Groups",
+                                               group_probability)
 
         def csp_probabilities(self):
             ''' Update self.probabilities based on results from CSP method.
@@ -588,7 +591,8 @@ class MinesweeperSolver:
                 # Otherwise each mine chance decrease opening chance
                 # by (1 - mine chance) times
                 if neighbor in self.probability.cells:
-                    zero_chance *= (1 - self.probability.cells[neighbor].mine_chance)
+                    zero_chance *= \
+                        (1 - self.probability.cells[neighbor].mine_chance)
             else:
                 self.probability.cells[cell].opening_chance = zero_chance
 
@@ -678,20 +682,13 @@ class MinesweeperSolver:
 
         # Empty bruteforce means illegal field (may happen when we try
         # all combinations for the next move)
-        if  self.bruteforce_solutions == []:
+        if self.bruteforce_solutions == []:
             return [-1], [-1]
 
-        # Bruteforce probabilities will go here
-        if len(self.covered_cells) <= -1: #16:
-            # Bruteforce-based calculation of probabilities
-            # if there are not a lot cells and mines left
-            self.bruteforce_probabilities()
-        # Otherwise use more complex approach
-        else:
-            # Calculate mine probability using various methods
-            self.calculate_probabilities()
-            # Calculate safe cells for teh next move in CSP
-            self.calculate_next_safe_csp()
+        # Calculate mine probability using various methods
+        self.calculate_probabilities()
+        # Calculate safe cells for teh next move in CSP
+        self.calculate_next_safe_csp()
 
         # Two more calculations that will be used to pick
         # the best random cell:
@@ -709,9 +706,10 @@ class MinesweeperSolver:
             lucky_cell = self.pick_a_random_cell(lucky_cells)
             # Store information about expected chance of mine and how
             # this chance was calculated
-            self.last_move_info = ("Probability",
-                                   self.probability.cells[lucky_cell].source,
-                                   self.probability.cells[lucky_cell].mine_chance)
+            self.last_move_info = \
+                ("Probability",
+                 self.probability.cells[lucky_cell].source,
+                 self.probability.cells[lucky_cell].mine_chance)
             return [lucky_cell, ], None
 
         # This should not happen, but here's a catch-all if it does
@@ -732,7 +730,7 @@ def main():
     game = mg.MinesweeperGame(settings, seed=0)
 
     # For testing: show the game field
-    #print(game.field2str(game.field))
+    # print(game.field2str(game.field))
 
     solver = MinesweeperSolver(settings)
 
