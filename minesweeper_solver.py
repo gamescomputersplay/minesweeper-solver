@@ -29,11 +29,14 @@ class MinesweeperSolver:
         self.shape = settings.shape
         # Number of total initial mines
         self.total_mines = settings.mines
+        # Does the field wraps around on the edges
+        self.wrap_around = settings.wrap_around
 
         # initiate helper (iteration through all cells, neighbors etc)
         # Or use one that was passed in.
         if helper is None:
-            self.helper = mg.MinesweeperHelper(self.shape)
+            self.helper = mg.MinesweeperHelper(self.shape,
+                                               wrap_around=self.wrap_around)
         else:
             self.helper = helper
 
@@ -83,7 +86,8 @@ class MinesweeperSolver:
         Reuse settings and helper from the original one.
         Copies are used to look into the 2nd move.
         '''
-        settings = mg.GameSettings(self.shape, self.total_mines)
+        settings = mg.GameSettings(self.shape, self.total_mines,
+                                   wrap_around=self.wrap_around)
         new_solver = MinesweeperSolver(settings, helper=self.helper)
         return new_solver
 
@@ -721,10 +725,10 @@ def main():
 
     settings = mg.GAME_TEST
     settings = mg.GAME_BEGINNER
-    settings = mg.GAME_INTERMEDIATE
-    # settings = mg.GAME_EXPERT
+    settings = mg.GAME_INTERMEDIATE_WRAP
 
     game = mg.MinesweeperGame(settings, seed=0)
+    print(game.field2str(game.field))
     solver = MinesweeperSolver(settings)
 
     while game.status == mg.STATUS_ALIVE:

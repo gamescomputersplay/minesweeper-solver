@@ -387,8 +387,13 @@ def main():
                mg.GAME_3D_EASY, mg.GAME_3D_MEDIUM, mg.GAME_3D_HARD,
                mg.GAME_4D_EASY, mg.GAME_4D_MEDIUM, mg.GAME_4D_HARD,
                mg.GAME_4D_HARDER)
+
     # Only 2D (traditional) minesweeper presets
     presets = (mg.GAME_BEGINNER, mg.GAME_INTERMEDIATE, mg.GAME_EXPERT)
+
+    # Expert with wrapping
+    presets = (mg.GAME_BEGINNER_WRAP, mg.GAME_INTERMEDIATE_WRAP, mg.GAME_EXPERT_WRAP, )
+
     # Only an expert 2D board
     presets = (mg.GAME_EXPERT, )
 

@@ -12,13 +12,15 @@ import numpy as np
 @dataclass
 class GameSettings:
     ''' Class to hold game settings:
-    dimensions of the board, number of mines
+    dimensions of the board, number of mines, use wrap around
     '''
     shape: tuple = (8, 8)
     mines: int = 10
     density: float = 0
+    wrap_around: bool = False
 
     def __post_init__(self):
+        # Calculate mine density (used only for information)
         self.density = self.mines / np.prod(self.shape)
 
     def __str__(self):
@@ -28,6 +30,7 @@ class GameSettings:
         output += f"Volume:{np.prod(self.shape)}, "
         output += f"Mines:{self.mines}, "
         output += f"Density:{self.density:.1%}, "
+        output += f"Wrap:{'yes' if self.wrap_around else 'no'}, "
         return output
 
 
@@ -36,15 +39,26 @@ class GameSettings:
 GAME_BEGINNER = GameSettings((8, 8), 10)
 GAME_INTERMEDIATE = GameSettings((16, 16), 40)
 GAME_EXPERT = GameSettings((30, 16), 99)
-# 3D example
+
+# 3D examples
 GAME_3D_EASY = GameSettings((5, 5, 5), 10)
 GAME_3D_MEDIUM = GameSettings((7, 7, 7), 33)
 GAME_3D_HARD = GameSettings((10, 10, 10), 99)
-# 4D example
+
+# 4D examples
 GAME_4D_EASY = GameSettings((4, 4, 4, 4), 10)
 GAME_4D_MEDIUM = GameSettings((4, 4, 4, 4), 20)
 GAME_4D_HARD = GameSettings((4, 4, 4, 4), 30)
 GAME_4D_HARDER = GameSettings((4, 4, 4, 4), 40)
+
+# Classic games, but with wrap around
+GAME_BEGINNER_WRAP = GameSettings((8, 8), 10, wrap_around=True)
+GAME_INTERMEDIATE_WRAP = GameSettings((16, 16), 40, wrap_around=True)
+GAME_EXPERT_WRAP = GameSettings((30, 16), 99, wrap_around=True)
+
+# Exotic games
+GAME_6D = GameSettings((4, 4, 4, 4, 4, 4), 50)
+
 # Small board for testing
 GAME_TEST = GameSettings((5, 4), 4)
 
@@ -83,10 +97,15 @@ class MinesweeperHelper:
     iteration over all cells etc
     '''
 
-    def __init__(self, shape):
-        ''' Only need one parameter: the shape of the field
+    def __init__(self, shape, wrap_around=False):
+        ''' Shape: list of sizes for dimensions (length of the list
+        will define how many dimensions the game has)
+        Wrap around: if opposite ends of the field are wrapped around
+        (Surface of a torus for 2D game)
         '''
         self.shape = shape
+
+        self.wrap_around = wrap_around
 
         # This is just a dict to store all the neighboring coordinates
         # for all cells, so we won't have to recalculate them every move
@@ -173,9 +192,17 @@ class MinesweeperHelper:
             if offset.count(1) == 0 and offset.count(-1) == 0:
                 continue
 
-            # If resulting coords are valid
-            cell_with_offset = tuple(cell[i] + offset[i]
-                                     for i in range(len(self.shape)))
+            # Different ways of calculating neighbors' coordinates
+            # with and without wrapping around
+            if self.wrap_around:
+                cell_with_offset = tuple((cell[i] + offset[i] +
+                                          self.shape[i]) % self.shape[i]
+                                          for i in range(len(self.shape)))
+            else:
+                cell_with_offset = tuple(cell[i] + offset[i]
+                                         for i in range(len(self.shape)))
+
+            # If resulting coords are valid: add them to the list of neighbors
             if self.valid_coords(cell_with_offset):
                 surroundings.append(cell_with_offset)
 
@@ -223,6 +250,9 @@ class MinesweeperGame:
         # Make sure there no more mines than cells minus one
         self.mines = min(settings.mines, np.prod(self.shape) - 1)
 
+        # Wrap around option
+        self.wrap_around = settings.wrap_around
+
         # Counter of remaining mines (according to what plays
         # marked as mines, can be inaccurate).
         self.remaining_mines = self.mines
@@ -231,7 +261,7 @@ class MinesweeperGame:
         if seed is not None:
             random.seed(seed)
 
-        self.helper = MinesweeperHelper(self.shape)
+        self.helper = MinesweeperHelper(self.shape, wrap_around=self.wrap_around)
 
         # Now we initiate "field": array of mines and numbers that player
         # cannot see yet

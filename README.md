@@ -2,8 +2,11 @@
 
 ### N-dimensional Solver / simulator 
 
-Minesweeper solver simulates or plays minesweeper games. It uses both deterministic and probability-based logic to come up with its moves, reaching the win rate of 38.6±0.3% for a standard Expert game (30x16, 99 mines). Simulator also supports N-dimensional minesweeper games.
+Minesweeper solver simulates or plays minesweeper games. It uses both deterministic and probability-based logic to come up with its moves, reaching the win rate of 38.6±0.3% for a standard Expert game (30x16, 99 mines).
 
+Simulator also supports N-dimensional minesweeper games. Although there is no limitations on the number of dimensions, it's the computational explosion that provides a limit. 6-dimensional 4^6 slows to a crawl (a minute per game), and 8-dimensional game crashed depleting all memory.
+
+It also supports wrapping the field around on itself. In case of 2D that would correspond to the surface of a torus.  
 ### Bot 
 
 Bot is an interface to the solver that would take screenshots, read the data, feed it to the solver and click the cells. It supports:
@@ -20,7 +23,7 @@ There is a way to add support to other minesweeper variations (say, Google Mines
 ## Files
 
 ### minesweeper_game.py
-Minesweeper game itself itself, plus some helper functions and constants, used throughout the project
+Minesweeper game itself, different game presets, plus some helper functions and constants, used throughout the project.
 
 ### minesweeper_solver.py
 The main part of the solver. Solver is stateless - all you need to do is make it aware of the game parameters (board size, and total number of mines) and pass in the current board. It will give you two lists: cells that are safe to click (no mines), and cells with mines. It also returns some stats about methods used to arrive at this conclusion.
@@ -32,7 +35,7 @@ Some classes used by the solver. Actually most of the heavy lifting is happening
 Functions for simulating multiple minesweeper games, together with some tools to aggregate and show statistics about the simulation.
 
 ### minesweeper_bot.py
-The bot: would take a screenshot, find a minesweeper game on it, and proceed to playing it multiple times, keeping track of the number of wins. Currently works with Arbiter and Minesweeper X with standard skins.
+The bot: would take a screenshot, find a minesweeper game on it, and proceed to playing it multiple times, keeping track of the number of wins. Currently works with Arbiter / Vienna / Minesweeper X with standard skins. Also works with 4D Minesweeper available on Steam.
 
 ## Solution methods
 
