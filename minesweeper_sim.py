@@ -382,17 +382,19 @@ def main():
     # Games to simulate
     runs = 100
 
-    # All popular minesweeper and multidimensional minesweeper presets
-    presets = (mg.GAME_BEGINNER, mg.GAME_INTERMEDIATE, mg.GAME_EXPERT,
-               mg.GAME_3D_EASY, mg.GAME_3D_MEDIUM, mg.GAME_3D_HARD,
+    # 2D (traditional) minesweeper presets
+    presets = (mg.GAME_BEGINNER, mg.GAME_INTERMEDIATE, mg.GAME_EXPERT)
+
+    # 2D with wrapping
+    presets = (mg.GAME_BEGINNER_WRAP, mg.GAME_INTERMEDIATE_WRAP, mg.GAME_EXPERT_WRAP, )
+
+    # All popular 3D and 4D presets
+    presets = (mg.GAME_3D_EASY, mg.GAME_3D_MEDIUM, mg.GAME_3D_HARD,
                mg.GAME_4D_EASY, mg.GAME_4D_MEDIUM, mg.GAME_4D_HARD,
                mg.GAME_4D_HARDER)
 
-    # Only 2D (traditional) minesweeper presets
-    presets = (mg.GAME_BEGINNER, mg.GAME_INTERMEDIATE, mg.GAME_EXPERT)
-
-    # Expert with wrapping
-    presets = (mg.GAME_BEGINNER_WRAP, mg.GAME_INTERMEDIATE_WRAP, mg.GAME_EXPERT_WRAP, )
+    # Exotic games
+    presets = (mg.GAME_1D, mg.GAME_6D)
 
     # Only an expert 2D board
     presets = (mg.GAME_EXPERT, )

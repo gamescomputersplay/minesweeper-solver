@@ -56,7 +56,8 @@ GAME_BEGINNER_WRAP = GameSettings((8, 8), 10, wrap_around=True)
 GAME_INTERMEDIATE_WRAP = GameSettings((16, 16), 40, wrap_around=True)
 GAME_EXPERT_WRAP = GameSettings((30, 16), 99, wrap_around=True)
 
-# Exotic games
+# Exotic settings
+GAME_1D = GameSettings((60,), 10)
 GAME_6D = GameSettings((4, 4, 4, 4, 4, 4), 50)
 
 # Small board for testing
@@ -480,6 +481,15 @@ class MinesweeperGame:
 
         return self.status
 
+    def field2str_1d(self, field_to_show, show_ruler=True):
+        ''' Visual representation of the 1D field
+        Done by converting it to a 2D field with height 1
+        '''
+        width = field_to_show.shape[0]
+        field_to_show = np.reshape(field_to_show, (width, 1))
+
+        return self.field2str_2d(field_to_show, show_ruler=True)
+
     @staticmethod
     def field2str_2d(field_to_show, show_ruler=True):
         ''' Visual representation of the 2D field
@@ -598,6 +608,8 @@ class MinesweeperGame:
         ''' Pick the right string representation function:
         works for 2 to 4 D minesweeper fields
         '''
+        if len(field_to_show.shape) == 1:
+            return self.field2str_1d(field_to_show, show_ruler)
         if len(field_to_show.shape) == 2:
             return self.field2str_2d(field_to_show, show_ruler)
         if len(field_to_show.shape) == 3:

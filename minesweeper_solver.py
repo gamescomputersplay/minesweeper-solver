@@ -726,9 +726,14 @@ def main():
     settings = mg.GAME_TEST
     settings = mg.GAME_BEGINNER
     settings = mg.GAME_INTERMEDIATE_WRAP
+    settings = mg.GAME_1D
+    settings = mg.GAME_EXPERT
 
     game = mg.MinesweeperGame(settings, seed=0)
-    print(game.field2str(game.field))
+
+    # For testing: show the game field
+    #print(game.field2str(game.field))
+
     solver = MinesweeperSolver(settings)
 
     while game.status == mg.STATUS_ALIVE:
