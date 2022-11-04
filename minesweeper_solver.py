@@ -713,7 +713,7 @@ class MinesweeperSolver:
             return [lucky_cell, ], None
 
         # This should not happen, but here's a catch-all if it does
-        self.last_move_info = ("Last Resort", None)
+        self.last_move_info = ("Last Resort", None, None)
         return [self.pick_a_random_cell(self.covered_cells), ], None
 
 
