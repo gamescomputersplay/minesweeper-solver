@@ -307,7 +307,7 @@ class MinesweeperSim:
                 print(game)
 
         # Game over
-        # Add game results to teh statistics
+        # Add game results to the statistics
         self.solver_stat.add_game(game.status)
 
         # Notify if deterministic method resulted in death

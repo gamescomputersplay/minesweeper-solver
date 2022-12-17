@@ -511,7 +511,7 @@ class MinesweeperBot:
 
     def make_a_move(self, screenshot=None):
         ''' Read the situation on the board,
-        run a solver for teh next move, click the cells
+        run a solver for the next move, click the cells
         '''
 
         def log_field(field, filename="log.log"):
@@ -543,7 +543,7 @@ class MinesweeperBot:
             self.bot_stat.add_game(mg.STATUS_WON)
             return mg.STATUS_WON
 
-        # For 4D Game: do the transformation for teh solver
+        # For 4D Game: do the transformation for the solver
         if self.is_4d:
             field = self.transform_to_4d(field)
 
@@ -608,7 +608,7 @@ def use_bot(games_to_play=100, settings=SETTINGS_MINESWEEPER_CLASSIC,
 
         print(f"Win rate: {wins / (game + 1):.2%}")
 
-        # CLick the new game button (every time, except the last)
+        # Click the new game button (every time, except the last)
         if game < games_to_play - 1:
             left = bot.cells_coordinates[0, 0, 0]
             right = bot.cells_coordinates[-1, 0, 2]

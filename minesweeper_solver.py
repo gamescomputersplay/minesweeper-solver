@@ -277,7 +277,7 @@ class MinesweeperSolver:
         filtered_permutations = []
         for permutation in permutations:
             for group in self.groups.exact_groups():
-                # Count mines in the solution in cells of teh group
+                # Count mines in the solution in cells of the group
                 mine_count = 0
                 for cell in group.cells:
                     if permutation[cells_positions[cell]]:
@@ -431,7 +431,7 @@ class MinesweeperSolver:
 
         # Generate clusters
         self.generate_clusters()
-        # DO all teh solving / calculate frequencies stuff
+        # Do all the solving / calculate frequencies stuff
         self.all_clusters.calculate_all()
 
         for cluster in self.all_clusters.clusters:
@@ -524,7 +524,7 @@ class MinesweeperSolver:
             '''
             for group in self.groups.exact_groups():
 
-                # Probability of each mine in teh group
+                # Probability of each mine in the group
                 group_probability = group.mines / len(group.cells)
                 for cell in group.cells:
 
@@ -687,7 +687,7 @@ class MinesweeperSolver:
 
         # Calculate mine probability using various methods
         self.calculate_probabilities()
-        # Calculate safe cells for teh next move in CSP
+        # Calculate safe cells for the next move in CSP
         self.calculate_next_safe_csp()
 
         # Two more calculations that will be used to pick
