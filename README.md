@@ -1,5 +1,13 @@
 # Minesweeper solver / bot
 
+### TLDR: I just want to run the bot
+
+To run the bot:
+1. Clone the repo, have all the dependencies installed.
+2. Launch minesweeper_bot.py
+3. Bring the minesweeper game to the screen (it should display unclicked empty field).
+4. Press F10. The bot should find the game on the screen and play 10 games.
+
 ### N-dimensional Solver / simulator 
 
 Minesweeper solver simulates or plays minesweeper games. It uses both deterministic and probability-based logic to come up with its moves, reaching the win rate of 38.6±0.3% for a standard Expert game (30x16, 99 mines).
