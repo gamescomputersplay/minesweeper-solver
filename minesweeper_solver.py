@@ -363,9 +363,9 @@ class MinesweeperSolver:
                 safe.extend(self.deduce_safe(group_a, group_b))
                 mines.extend(self.deduce_mines(group_a, group_b))
 
-                # Difference in cells and mines can also become a new group
-                # As lost as one is subset of the other and they have different
-                # number of mines
+                # If group A is a subset of group B and B has more mines
+                # we can create a new group that would contain
+                # B-A cells and B-A mines
                 # len(group_b.cells) < 8 prevents computational explosion on
                 # multidimensional fields
                 if len(group_b.cells) < 8 and \
