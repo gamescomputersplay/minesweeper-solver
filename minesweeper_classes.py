@@ -293,7 +293,7 @@ class GroupCluster:
         all possible mine/safe variations that fits all groups' condition.
         Solution is in the form of a list of Tru/False (Tru for mine,
         False for safe), with positions in the solution corresponding to cells
-        in self.cells list. SOlution will be stored in self.solutions
+        in self.cells list. Solution will be stored in self.solutions
         Will result in empty solution if the initial cluster is too big.
         '''
         # for clusters with 1 group - there is not enough data to solve them

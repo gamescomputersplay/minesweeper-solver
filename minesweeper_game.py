@@ -386,7 +386,7 @@ class MinesweeperGame:
                         zeros.append(neighbor)
 
     def safe_first_click(self, cell):
-        ''' Check conditions for teh first click.
+        ''' Check conditions for the first click.
         If it is a mine, move it. Recalculate field.
         '''
         if self.helper.valid_coords(cell) and \
@@ -719,7 +719,7 @@ def main():
         print(f"Status: {STATUS_MESSAGES[game.status]}")
         print(f"Remaining mines: {game.remaining_mines}")
 
-    print("Thanks you for playing!")
+    print("Thank you for playing!")
 
 
 if __name__ == "__main__":
