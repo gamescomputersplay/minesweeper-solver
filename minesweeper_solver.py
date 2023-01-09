@@ -627,7 +627,7 @@ class MinesweeperSolver:
         '''
         return random.choice(cells)
 
-    def solve(self, field, next_moves=1):
+    def solve(self, field, next_moves=1, deterministic=False):
         ''' Main solving function.
         Go through various solving methods and return safe and mines lists
         as long as any of the methods return results
@@ -635,6 +635,8 @@ class MinesweeperSolver:
         - the field (what has been uncovered so far).
         - next_moves: remaining levels of recursion. 0 - don't look into
           future boards. 1 - look 1 move ahead etc
+        - deterministic: don't use random at all. In case of several equally
+          probably safe cells, pick the first one
         Out:
         - list of safe cells
         - list of mines
@@ -699,11 +701,20 @@ class MinesweeperSolver:
 
         # Get cells that is least likely a mine
         lucky_cells = \
-            self.probability.get_luckiest(self.all_clusters, next_moves, self)
+            self.probability.get_luckiest(self.all_clusters, next_moves,
+                                          deterministic, self)
 
         if lucky_cells:
-            # There may be more than one such cells, pick a random one
-            lucky_cell = self.pick_a_random_cell(lucky_cells)
+
+            # There may be more than one such cells, so either
+            # Pick the fist one, if solver is in deterministic mode
+            if deterministic:
+                lucky_cell = lucky_cells[0]
+            # or pick a random one
+            else:
+                lucky_cell = self.pick_a_random_cell(lucky_cells)
+
+
             # Store information about expected chance of mine and how
             # this chance was calculated
             self.last_move_info = \

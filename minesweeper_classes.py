@@ -807,12 +807,13 @@ class AllProbabilities():
                 mine_count += 1
         return mine_count
 
-    def get_luckiest(self, clusters, next_moves, original_solver):
+    def get_luckiest(self, clusters, next_moves, deterministic, original_solver):
         ''' Using information about mine probability ,opening probability
         and so on, return a list of cells with the best chances.
         Also, if next_moves > 0 look into future games and use chances of mine
         in the future moves. For that, use "original_solver" - it has current
         field information
+        deterministic: should the solver for the next move be deterministic
         '''
 
         def simple_best_probability():
@@ -869,7 +870,7 @@ class AllProbabilities():
                 # Run the solver, pass in the updated field and decreased
                 # recursion value
                 new_safe, new_mines = \
-                    new_solver.solve(new_field, next_moves - 1)
+                    new_solver.solve(new_field, next_moves - 1, deterministic)
 
                 # Ignore illegal combinations
                 if new_safe == [-1]:
