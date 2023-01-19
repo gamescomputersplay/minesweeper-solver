@@ -2,19 +2,24 @@
 
 ### TLDR: I just want to run the bot
 
+Please note, the bot only supports winmine (standard Windows minesweeper), Minesweeper X, Abriter, Vienna and only the default Minesweeper skin. Anything else will likely result in "Field not found" error".
+
 To run the bot:
+
 1. Clone the repo, have all the dependencies installed.
 2. Launch minesweeper_bot.py
-3. Bring the minesweeper game to the screen (it should display unclicked empty field).
+3. Bring the minesweeper game to the screen (it should display an unclicked empty field).
 4. Press F10. The bot should find the game on the screen and play 10 games.
+
+
 
 ### N-dimensional Solver / simulator 
 
-Minesweeper solver simulates or plays minesweeper games. It uses both deterministic and probability-based logic to come up with its moves, reaching the win rate of 38.6±0.3% for a standard Expert game (30x16, 99 mines).
+Minesweeper solver simulates or plays minesweeper games. It uses both deterministic and probability-based logic to come up with its moves, reaching a win rate of 38.6±0.3% for a standard Expert game (30x16, 99 mines).
 
 Simulator also supports N-dimensional minesweeper games. With N from 1 to anything.
 
-Note, that although there is no upper boundary on the number of dimensions, it's the computational explosion that provides a limit. 7-dimensional 4^7 slows to a crawl (it requires several minutes per one game simulation), and 8-dimensional game crashed, depleting all my laptop's memory in the process.
+Note, that although there is no upper boundary on the number of dimensions, it's the computational explosion that provides a limit. 7-dimensional 4^7 slows to a crawl (it requires several minutes per one game simulation), and an 8-dimensional game crashes, depleting all my laptop's memory in the process.
 
 It also supports wrapping the field around on itself. In case of 1D that's a circumference of a circle, for 2D that would correspond to the surface of a 3D torus. For N dimensions - surface of N+1 torus, I guess???
 
@@ -48,7 +53,7 @@ Functions for simulating multiple minesweeper games, together with some tools to
 ### minesweeper_bot.py
 The bot: would take a screenshot, find a minesweeper game on it, and proceed to playing it multiple times, keeping track of the number of wins. Currently works with Arbiter / Vienna / Minesweeper X with standard skins. Also works with 4D Minesweeper available on Steam.
 
-## Solution methods
+## Solving methods
 
 In an attempt to find the best cells to click (or marked as mines), solver goes through a number of methods - from trivial ones to more complex. As long as a method yields results - solver stops and returns that result. Here are the methods (Percentage is how many cells are solved using this method in an average 2D expert game).
 
@@ -110,4 +115,3 @@ For top potential cells the program calculates what number may appear in this ce
 
 
 This minesweeper solver / bot is written in Python as a hobby project by GamesComputerPlay, check out [my youtube channel](https://www.youtube.com/c/GamesComputersPlay) for other "Python for games" stuff.
-
