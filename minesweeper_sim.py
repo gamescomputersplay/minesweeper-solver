@@ -21,9 +21,8 @@ SHOW_SEED = False
 SHOW_METHODS_STAT = True
 SHOW_PROBABILITY_STAT = True
 
-# How many moves ahead analyze (0 - only the current position)
-# Default is 1
-LOOK_NEXT_MOVES = 1
+# Use faster, but a bit less winning settings
+OPTIMIZE_FOR_SPEED = False
 
 
 class SolverStat:
@@ -295,7 +294,7 @@ class MinesweeperSim:
         while game.status == mg.STATUS_ALIVE:
 
             safe, mines = self.solver.solve(game.uncovered,
-                                            next_moves=LOOK_NEXT_MOVES)
+                                            optimize_for_speed=OPTIMIZE_FOR_SPEED)
             if verbose:
                 print(f"Player: safe={safe}, mines={mines}")
             game.make_a_move(safe, mines)

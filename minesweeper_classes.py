@@ -870,7 +870,7 @@ class AllProbabilities():
                 # Run the solver, pass in the updated field and decreased
                 # recursion value
                 new_safe, new_mines = \
-                    new_solver.solve(new_field, next_moves - 1, deterministic)
+                    new_solver.solve(new_field, deterministic=deterministic, this_is_next_move=True)
 
                 # Ignore illegal combinations
                 if new_safe == [-1]:

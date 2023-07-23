@@ -627,20 +627,25 @@ class MinesweeperSolver:
         '''
         return random.choice(cells)
 
-    def solve(self, field, next_moves=1, deterministic=False):
+    def solve(self, field, deterministic=False, optimize_for_speed=False, this_is_next_move=False):
         ''' Main solving function.
         Go through various solving methods and return safe and mines lists
         as long as any of the methods return results
         In:
         - the field (what has been uncovered so far).
-        - next_moves: remaining levels of recursion. 0 - don't look into
-          future boards. 1 - look 1 move ahead etc
         - deterministic: don't use random at all. In case of several equally
           probably safe cells, pick the first one
+        - optimize_for_speed: use faster but a bit less winning settings
+          (no recursion into the next move)
+        - this_is_next_move: Flag that this run is a recursive run for the next move
+
         Out:
         - list of safe cells
         - list of mines
         '''
+        if optimize_for_speed:
+            this_is_next_move = False
+
         # Store field as an instance variable
         self.field = field
 
@@ -669,7 +674,9 @@ class MinesweeperSolver:
                             (self.method_bruteforce, "Bruteforce"),
                             ]
 
-        if next_moves == 0:
+        if optimize_for_speed:
+            solution_methods = solution_methods[:5]
+        elif this_is_next_move:
             solution_methods = solution_methods[:4]
 
         # If any of the methods returned results - return the result
@@ -700,6 +707,11 @@ class MinesweeperSolver:
         self.calculate_frontier()
 
         # Get cells that is least likely a mine
+        next_moves = 1
+        # If we optimize for speed or this is already "next_move"
+        # set next_moves to 0
+        if optimize_for_speed or this_is_next_move:
+            next_moves = 0
         lucky_cells = \
             self.probability.get_luckiest(self.all_clusters, next_moves,
                                           deterministic, self)
@@ -747,7 +759,7 @@ def main():
 
     while game.status == mg.STATUS_ALIVE:
 
-        safe, mines = solver.solve(game.uncovered, next_moves=1)
+        safe, mines = solver.solve(game.uncovered)
         method, random_method, chance = solver.last_move_info
 
         chance_str, random_method_str = "", ""
