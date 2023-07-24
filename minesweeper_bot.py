@@ -450,10 +450,10 @@ class MinesweeperBot:
                     if STOP_AT_UNKNOWN_CELL:
                         filename = f"./samples/unknown-{i}-{j}.png"
                         cell.save(filename)
-                        raise Exception(
+                        raise ValueError(
                             f"Can't read cell at ({i}, {j})," +
                             f"saved as {filename}")
-                    elif not warning_was_fired:
+                    if not warning_was_fired:
                         print("Some cells were not recognized, but ",
                               "STOP_AT_UNKNOWN_CELL is set to False. ")
                         warning_was_fired = True
