@@ -135,3 +135,6 @@ dmypy.json
 *.png
 # But those in samples are needed
 !/samples/*.png
+
+# DS_store
+.DS_store
