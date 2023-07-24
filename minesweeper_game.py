@@ -8,6 +8,7 @@ import random
 from dataclasses import dataclass
 import numpy as np
 
+from PIL import Image, ImageDraw
 
 @dataclass
 class GameSettings:
@@ -270,7 +271,7 @@ class MinesweeperGame:
 
         # If field_str passed in - use it
         if field_str is not None:
-            self.field = self.import_field(field_str)
+            self.field = self.import_mines_from_field(field_str)
         # Otherwise, generate the field
         else:
             self.field = self.generate_mines()
@@ -680,7 +681,7 @@ class MinesweeperGame:
             field_str += LEGEND[self.field[cell]]
         return field_str
 
-    def import_field(self, field_str):
+    def import_mines_from_field(self, field_str):
         '''Generate field from the string (that was saved by export)
         '''
         field = np.full(self.shape, 0)
@@ -693,6 +694,41 @@ class MinesweeperGame:
             string_pointer += 1
         return field
 
+    def export_as_pic(self, skinfile):
+        ''' Export current field (the ujncovered part) 
+        as a picture (use same samples
+        that bot uses to recognize the board)
+        skinfile: Skin (pictures of elements) to use.
+                  Uses Minesweeper X format.
+        Can be used to visualize the game
+        '''
+
+        # Load elements from the skin
+        skin = Image.open(skinfile)
+        skin_data = {}
+
+        # Numbers from 0 to 8
+        for mine_count in range(9):
+            skin_data[mine_count] = skin.crop((
+                mine_count * 16, 0,
+                (mine_count + 1) * 16, 16
+                ))
+        skin_data[CELL_COVERED] = skin.crop((0, 16, 16, 32))
+        # In thins context "mine" means "a flag"
+        skin_data[CELL_MINE] = skin.crop((48, 16, 64, 32))
+        skin_data[CELL_FALSE_MINE] = skin.crop((64, 16, 80, 32))
+        skin_data[CELL_EXPLODED_MINE] = skin.crop((80, 16, 96, 32))
+
+        picture = Image.new(mode="RGB",
+                            size=(self.shape[0] * 16,
+                            self.shape[1] * 16),
+                            color="green")
+        for cell in self.helper.iterate_over_all_cells():
+            i, j = cell
+            picture.paste(
+                skin_data[self.uncovered[cell]], (i*16, j*16, (i+1)*16, (j+1)*16)
+            )
+        return picture
 
 def main():
     ''' Some tests for minesweeper sim

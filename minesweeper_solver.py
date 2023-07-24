@@ -745,10 +745,10 @@ def main():
     '''
 
     settings = mg.GAME_TEST
-    settings = mg.GAME_BEGINNER
     settings = mg.GAME_INTERMEDIATE_WRAP
     settings = mg.GAME_1D
     settings = mg.GAME_EXPERT
+    settings = mg.GAME_BEGINNER
 
     game = mg.MinesweeperGame(settings, seed=0)
 
@@ -756,6 +756,8 @@ def main():
     # print(game.field2str(game.field))
 
     solver = MinesweeperSolver(settings)
+
+    move_counter = 1
 
     while game.status == mg.STATUS_ALIVE:
 
@@ -769,11 +771,16 @@ def main():
         if random_method is not None:
             random_method_str = f" ({random_method})"
 
-        print(f"Method: {method}{random_method_str}, {chance_str}" +
+        print(f"Move: {move_counter}\n"
+              f"Method: {method}{random_method_str}, {chance_str}\n" +
               f"Safe: {safe}, Mines: {mines}")
 
         game.make_a_move(safe, mines)
         print(game)
+
+        # Exporting game fireld as a picture
+        #game.export_as_pic("./samples/winxpskin.bmp").save(f"test-{move_counter}.png")
+        move_counter += 1
 
     print(mg.STATUS_MESSAGES[game.status])
 
